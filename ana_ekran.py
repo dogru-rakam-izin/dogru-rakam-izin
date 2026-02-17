@@ -5,7 +5,8 @@ import json
 from datetime import datetime
 
 # --- YAPILANDIRMA (SİZİN BİLGİLERİNİZ) ---
-APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx53rgpCGw9iQDlGl00SgrkFpXrwBxETdlhzx2o2gmNvb4pmV7Ik4VKDQsaUGojR0Sb/exec"
+APPS_SCRIPT_URL = # Eski URL'yi silip yerine bunu yapıştırın:
+APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyz1FkOaVRpkSAQoJrhaZcXsu_qQuYN-Y18S-yQblLIUqGBlFgoryoNW4eLfw8d0DZ1/exec"
 SHEET_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 SHEET_READ_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv"
 
@@ -63,7 +64,7 @@ if menu == "Personel İzin Formu":
                     "bit": bit.strftime("%d/%m/%Y")
                 }
                 try:
-                    response = requests.post(APPS_SCRIPT_URL, data=json.dumps(payload))
+                    response = requests.post(APPS_SCRIPT_URL, data=json.dumps(payload), timeout=10)
                     st.success(f"Sayın {ad}, talebiniz başarıyla iletildi ve kayıt altına alındı.")
                     st.balloons()
                 except:
@@ -89,3 +90,4 @@ else:
             st.info("Henüz sisteme girilmiş bir izin kaydı bulunamadı.")
     elif sifre != "":
         st.error("Hatalı şifre!")
+
