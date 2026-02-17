@@ -1,31 +1,32 @@
 import streamlit as st
 import pandas as pd
 import requests
+import json
 from datetime import datetime
 
-# --- GOOGLE SHEETS AYARLARI ---
-# Tablo ID'niz sisteme tanımlandı
-SHEET_ID = "1UQLc2FmIuvFptf14nbPT83ZK4p42OpYAkFYSrZVdIlc"
-# Verileri okumak için CSV formatında URL
+# --- YAPILANDIRMA (SİZİN BİLGİLERİNİZ) ---
+APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx53rgpCGw9iQDlGl00SgrkFpXrwBxETdlhzx2o2gmNvb4pmV7Ik4VKDQsaUGojR0Sb/exec"
+SHEET_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 SHEET_READ_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv"
-# Veri eklemek için Google Form/AppScript yerine en basit yöntem:
-# (Not: Bu yöntem için tablonun "Herkes - Düzenleyici" olması şarttır)
 
-st.set_page_config(page_title="Doğru Rakam İzin Paneli", layout="wide")
+st.set_page_config(page_title="Doğru Rakam İzin Sistemi", layout="wide")
 
+# --- VERİ OKUMA FONKSİYONU ---
 def verileri_yukle():
     try:
         df = pd.read_csv(SHEET_READ_URL)
-        # Sütun isimlerini temizle
+        # Sütun isimlerindeki boşlukları temizle
         df.columns = [c.strip() for c in df.columns]
         return df
     except:
         return pd.DataFrame(columns=["Tarih", "TC No", "Ad Soyad", "Branş", "Tür", "Başlangıç", "Dönüş", "Durum"])
 
-# --- LOGO VE ARAYÜZ ---
-st.sidebar.title("Doğru Rakam")
+# --- SOL MENÜ ---
+st.sidebar.title("DOĞRU RAKAM")
+st.sidebar.info("Özel Eğitim İzin Takip Sistemi v2.0")
 menu = st.sidebar.radio("MENÜ", ["Personel İzin Formu", "Yönetici Analiz Paneli"])
 
+# --- 1. BÖLÜM: PERSONEL FORMU ---
 if menu == "Personel İzin Formu":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
     st.subheader("Dijital İzin Talep Formu")
@@ -51,18 +52,40 @@ if menu == "Personel İzin Formu":
         
         if submit:
             if ad and tc and onay:
-                # Veriyi geçici olarak göster (Google Sheets API entegrasyonu için 
-                # manuel olarak tablonuza ekleme yapılması veya AppScript kullanılması önerilir)
-                st.success(f"Sayın {ad}, talebiniz sisteme iletildi. (Tablonuzu kontrol edin)")
-                # Google Sheets'e veri yazma kısmı için AppScript URL'niz gerekecektir.
+                # Veriyi Google Sheets'e gönder
+                payload = {
+                    "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    "tc": str(tc),
+                    "ad": ad,
+                    "brans": brans,
+                    "tur": tur,
+                    "bas": bas.strftime("%d/%m/%Y"),
+                    "bit": bit.strftime("%d/%m/%Y")
+                }
+                try:
+                    response = requests.post(APPS_SCRIPT_URL, data=json.dumps(payload))
+                    st.success(f"Sayın {ad}, talebiniz başarıyla iletildi ve kayıt altına alındı.")
+                    st.balloons()
+                except:
+                    st.error("Bir bağlantı sorunu oluştu, lütfen tekrar deneyin.")
             else:
-                st.error("Lütfen tüm alanları doldurun.")
+                st.error("Lütfen tüm alanları doldurun ve onay kutusunu işaretleyin.")
 
+# --- 2. BÖLÜM: YÖNETİCİ PANELİ ---
 else:
     st.title("📊 Yönetici Takip Paneli")
-    df = verileri_yukle()
-    if not df.empty:
-        st.write("### Güncel İzin Listesi (Google Sheets'ten)")
-        st.dataframe(df, use_container_width=True)
-    else:
-        st.info("Henüz kayıtlı veri bulunamadı.")
+    sifre = st.text_input("Yönetici Şifresi", type="password")
+    
+    if sifre == "1234": # Şifreniz
+        df = verileri_yukle()
+        if not df.empty:
+            st.write("### Güncel İzin Listesi")
+            st.dataframe(df, use_container_width=True)
+            
+            # Excel olarak indir
+            csv = df.to_csv(index=False).encode('utf-8-sig')
+            st.download_button("📥 Listeyi İndir (CSV)", csv, "Izin_Listesi.csv", "text/csv")
+        else:
+            st.info("Henüz sisteme girilmiş bir izin kaydı bulunamadı.")
+    elif sifre != "":
+        st.error("Hatalı şifre!")
