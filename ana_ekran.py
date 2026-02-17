@@ -15,63 +15,77 @@ def verileri_yukle():
     try:
         df = pd.read_csv(SHEET_READ_URL)
         df.columns = [c.strip() for c in df.columns]
+        # Tarih sütununu gerçek tarih formatına çevir
+        df['Başlangıç_DT'] = pd.to_datetime(df['Başlangıç'], dayfirst=True, errors='coerce')
+        df['Ay'] = df['Başlangıç_DT'].dt.strftime('%B %Y')
         return df
     except:
-        return pd.DataFrame(columns=["Tarih", "TC No", "Ad Soyad", "Branş", "Tür", "Başlangıç", "Dönüş", "Durum"])
+        return pd.DataFrame()
 
 # --- MENÜ ---
-menu = st.sidebar.radio("MENÜ", ["Personel İzin Formu", "Yönetici Paneli (Onay & Takip)"])
+menu = st.sidebar.radio("MENÜ", ["Personel İzin Formu", "Yönetici Paneli"])
 
 if menu == "Personel İzin Formu":
     st.title("🏢 DOĞRU RAKAM İZİN FORMU")
-    df_mevcut = verileri_yukle()
-    
     with st.form("personel_formu", clear_on_submit=True):
         f1, f2 = st.columns(2)
         with f1:
             ad = st.text_input("Adı Soyadı")
             tc = st.text_input("TC Kimlik No", max_chars=11)
-            brans = st.selectbox("Branş", ["Uzman Öğretici", "Özel Eğitim Öğretmeni", "İdari"])
+            brans = st.selectbox("Branş", ["Uzman Öğretici", "Özel Eğitim Öğretmeni", "Psikolog", "Odyolog", "İdari"])
         with f2:
             tur = st.selectbox("İzin Türü", ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu"])
-            bas = st.date_input("Başlangıç")
-            bit = st.date_input("Dönüş")
+            bas = st.date_input("Başlangıç Tarihi")
+            bit = st.date_input("Dönüş Tarihi")
         
-        # --- KALAN İZİN HESAPLAMA GÖRÜNÜMÜ ---
-        if tc:
-            kullanilan = len(df_mevcut[(df_mevcut['TC No'].astype(str) == str(tc)) & (df_mevcut['Durum'] == 'Onaylandı') & (df_mevcut['Tür'] == tur)])
-            st.info(f"Bilgi: Bu türde daha önce {kullanilan} adet onaylanmış izniniz bulunuyor.")
-
         submit = st.form_submit_button("Talebi Gönder")
         if submit and ad and tc:
-            payload = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": brans, "tur": tur, "bas": str(bas), "bit": str(bit)}
+            payload = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": brans, "tur": tur, "bas": bas.strftime("%d/%m/%Y"), "bit": bit.strftime("%d/%m/%Y")}
             requests.post(APPS_SCRIPT_URL, data=json.dumps(payload))
-            st.success("Talebiniz yönetici onayına gönderildi.")
+            st.success("Talebiniz iletildi.")
 
 else:
-    st.title("📊 Yönetici Onay ve Analiz Paneli")
-    sifre = st.text_input("Şifre", type="password")
+    st.title("📊 Yönetici Kontrol & Analiz Paneli")
+    sifre = st.text_input("Yönetici Şifresi", type="password")
     
     if sifre == "1234":
         df = verileri_yukle()
         
-        # --- ÖZET İSTATİSTİKLER ---
-        st.subheader("Genel Durum Analizi")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Toplam Talep", len(df))
-        c2.metric("Onay Bekleyen", len(df[df['Durum'] == 'Bekliyor']))
-        c3.metric("Onaylanan", len(df[df['Durum'] == 'Onaylandı']))
+        tab1, tab2, tab3 = st.tabs(["📝 İzin Ekle/Onayla", "📈 Ay Bazlı Analiz", "👤 Personel Takip"])
+        
+        with tab1:
+            st.subheader("Manuel İzin Ekle (Yönetici)")
+            with st.expander("Yeni Kayıt Ekle"):
+                with st.form("yönetici_ekleme"):
+                    e1, e2 = st.columns(2)
+                    y_ad = e1.text_input("Personel Adı")
+                    y_tc = e1.text_input("TC No")
+                    y_tur = e2.selectbox("İzin Türü", ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu"])
+                    y_bas = e2.date_input("Başlangıç")
+                    y_bit = e2.date_input("Dönüş")
+                    y_submit = st.form_submit_button("Kaydı Tabloya İşle")
+                    if y_submit:
+                        p = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(y_tc), "ad": y_ad, "brans": "Yönetici Girişi", "tur": y_tur, "bas": y_bas.strftime("%d/%m/%Y"), "bit": y_bit.strftime("%d/%m/%Y")}
+                        requests.post(APPS_SCRIPT_URL, data=json.dumps(p))
+                        st.success("Kayıt eklendi!")
+            
+            st.write("---")
+            st.write("### Tüm İzin Talepleri")
+            st.dataframe(df, use_container_width=True)
 
-        st.write("---")
-        st.subheader("İzin Talepleri Listesi")
-        
-        # Onaylama Mekanizması (Basitleştirilmiş)
-        # Not: Tam onay butonu için Google Sheets'te ilgili satırı güncelleyen bir script gerekir.
-        # Şimdilik listeyi gösterip "Durum" sütununa göre filtreleme yapıyoruz.
-        
-        st.dataframe(df, use_container_width=True)
-        
-        # Personel Bazlı Kalan İzin Tablosu
-        st.subheader("👤 Personel Bazlı Kullanılan İzinler")
-        personel_ozet = df[df['Durum'] == 'Onaylandı'].groupby(['Ad Soyad', 'Tür']).size().reset_index(name='Kullanılan Gün')
-        st.table(personel_ozet)
+        with tab2:
+            st.subheader("📅 Aylık Toplam İzin Kullanımı")
+            if not df.empty:
+                aylik_ozet = df.groupby('Ay').size().reset_index(name='Toplam İzin Sayısı')
+                st.bar_chart(aylik_ozet.set_index('Ay'))
+                st.table(aylik_ozet)
+            else:
+                st.info("Analiz için veri bulunamadı.")
+
+        with tab3:
+            st.subheader("🔍 Personel Bazlı Detaylar")
+            if not df.empty:
+                secilen_kisi = st.selectbox("Personel Seçin", df['Ad Soyad'].unique())
+                kisi_df = df[df['Ad Soyad'] == secilen_kisi]
+                st.write(f"**{secilen_kisi}** toplamda **{len(kisi_df)}** kez izin kullanmış.")
+                st.dataframe(kisi_df[['Tarih', 'Tür', 'Başlangıç', 'Dönüş', 'Durum']])
