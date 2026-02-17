@@ -1,0 +1,3 @@
+@echo off
+"C:\Users\KullanıcıAdınız\AppData\Local\Programs\Python\Python312\python.exe" -m streamlit run ana_ekran.py
+pause
