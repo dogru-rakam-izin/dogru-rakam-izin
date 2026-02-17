@@ -5,7 +5,6 @@ import json
 from datetime import datetime
 
 # --- YAPILANDIRMA (SİZİN BİLGİLERİNİZ) ---
-APPS_SCRIPT_URL = # Eski URL'yi silip yerine bunu yapıştırın:
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyz1FkOaVRpkSAQoJrhaZcXsu_qQuYN-Y18S-yQblLIUqGBlFgoryoNW4eLfw8d0DZ1/exec"
 SHEET_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 SHEET_READ_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv"
@@ -90,4 +89,5 @@ else:
             st.info("Henüz sisteme girilmiş bir izin kaydı bulunamadı.")
     elif sifre != "":
         st.error("Hatalı şifre!")
+
 
