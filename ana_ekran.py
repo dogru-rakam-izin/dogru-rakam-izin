@@ -28,8 +28,7 @@ IZIN_LISTESI = [
 def verileri_yukle():
     try:
         df = pd.read_csv(SHEET_READ_URL)
-        if df.empty:
-            return pd.DataFrame()
+        if df.empty: return pd.DataFrame()
         df.columns = [c.strip() for c in df.columns]
         
         def sure_hesapla(row):
@@ -46,17 +45,14 @@ def verileri_yukle():
                     bit = datetime.strptime(str(row['Dönüş']), fmt)
                     fark = (bit - bas).days
                     return int(fark)
-            except:
-                return 0
+            except: return 0
 
         df['Sure_Deger'] = df.apply(sure_hesapla, axis=1)
         df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay_Ismi'] = df['Tarih_Obj'].dt.strftime('%B').map(TR_AYLAR) + " " + df['Tarih_Obj'].dt.strftime('%Y')
         return df
-    except:
-        return pd.DataFrame()
+    except: return pd.DataFrame()
 
-# --- MENÜ ---
 menu = st.sidebar.radio("MENÜ SEÇİMİ", ["⬇️ PERSONEL İZİN TALEBİ", "🔐 YÖNETİCİ PANELİ"])
 
 if menu == "⬇️ PERSONEL İZİN TALEBİ":
@@ -73,42 +69,4 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
         with f2:
             if tip == "Saatlik":
                 s1, s2 = st.columns(2)
-                saat1 = s1.time_input("Çıkış Saati")
-                saat2 = s2.time_input("Dönüş Saati")
-                bas_str = f"{tar.strftime('%d/%m/%Y')} {saat1.strftime('%H:%M')}"
-                bit_str = f"{tar.strftime('%d/%m/%Y')} {saat2.strftime('%H:%M')}"
-            else:
-                donus = st.date_input("İş Başı Tarihi")
-                bas_str = tar.strftime('%d/%m/%Y')
-                bit_str = donus.strftime('%d/%m/%Y')
-        
-        onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
-        if st.form_submit_button("TALEBİ GÖNDER"):
-            if ad and tc and onay:
-                p_data = {
-                    "tarih": datetime.now().strftime("%d/%m/%Y"),
-                    "tc": str(tc), "ad": ad, "brans": "Personel",
-                    "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str
-                }
-                requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
-                st.success("Talebiniz iletildi!")
-                st.balloons()
-            else:
-                st.warning("Lütfen tüm alanları doldurun.")
-
-else:
-    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
-    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
-    
-    if sifre == "1234":
-        df = verileri_yukle()
-        if not df.empty:
-            tab1, tab2 = st.tabs(["📊 Aylık Personel Karnesi", "📝 Manuel İzin Girişi"])
-            
-            with tab1:
-                aylar = sorted(df['Ay_Ismi'].dropna().unique(), reverse=True)
-                if aylar:
-                    sec_ay = st.selectbox("Ay Seçin", aylar)
-                    ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
-                    
-                    # Karne hesaplama ve sayı formatlama (2.0 -> 2)
+                saat1 = s1.time_input
