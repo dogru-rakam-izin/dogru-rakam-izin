@@ -18,12 +18,7 @@ TR_AYLAR = {
     "September": "Eylül", "October": "Ekim", "November": "Kasım", "December": "Aralık"
 }
 
-# --- İZİN TÜRLERİ ---
-IZIN_LISTESI = [
-    "Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", 
-    "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", 
-    "Vefat İzni", "Babalık İzni", "Eğitim / Seminer"
-]
+IZIN_LISTESI = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim / Seminer"]
 
 def verileri_yukle():
     try:
@@ -35,16 +30,12 @@ def verileri_yukle():
             try:
                 if "Saatlik" in str(row['Tür']):
                     fmt = "%d/%m/%Y %H:%M"
-                    bas = datetime.strptime(str(row['Başlangıç']), fmt)
-                    bit = datetime.strptime(str(row['Dönüş']), fmt)
-                    fark = bit - bas
-                    return 0, float(round(fark.seconds / 3600, 1))
+                    bas, bit = datetime.strptime(str(row['Başlangıç']), fmt), datetime.strptime(str(row['Dönüş']), fmt)
+                    return 0, float(round((bit - bas).seconds / 3600, 1))
                 else:
                     fmt = "%d/%m/%Y"
-                    bas = datetime.strptime(str(row['Başlangıç']), fmt)
-                    bit = datetime.strptime(str(row['Dönüş']), fmt)
-                    fark = (bit - bas).days
-                    return int(fark), 0
+                    bas, bit = datetime.strptime(str(row['Başlangıç']), fmt), datetime.strptime(str(row['Dönüş']), fmt)
+                    return int((bit - bas).days), 0
             except: return 0, 0
 
         df[['Gun_Deger', 'Saat_Deger']] = df.apply(lambda r: pd.Series(sure_ayristir(r)), axis=1)
@@ -57,87 +48,51 @@ menu = st.sidebar.radio("MENÜ SEÇİMİ", ["⬇️ PERSONEL İZİN TALEBİ", "�
 
 if menu == "⬇️ PERSONEL İZİN TALEBİ":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
-    ad = st.text_input("Ad Soyad")
-    tc = st.text_input("TC Kimlik No", max_chars=11)
+    ad, tc = st.text_input("Ad Soyad"), st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("p_form_indir_v2"):
+    with st.form("p_form"):
         f1, f2 = st.columns(2)
         with f1:
-            tur = st.selectbox("İzin Türü", IZIN_LISTESI)
-            tar = st.date_input("İzin Tarihi")
+            tur, tar = st.selectbox("İzin Türü", IZIN_LISTESI), st.date_input("İzin Tarihi")
         with f2:
             if tip == "Saatlik":
-                s1 = st.time_input("Çıkış Saati")
-                s2 = st.time_input("Dönüş Saati")
-                bas_str = f"{tar.strftime('%d/%m/%Y')} {s1.strftime('%H:%M')}"
-                bit_str = f"{tar.strftime('%d/%m/%Y')} {s2.strftime('%H:%M')}"
+                s1, s2 = st.time_input("Çıkış"), st.time_input("Dönüş")
+                bas_str, bit_str = f"{tar.strftime('%d/%m/%Y')} {s1.strftime('%H:%M')}", f"{tar.strftime('%d/%m/%Y')} {s2.strftime('%H:%M')}"
             else:
-                donus = st.date_input("İş Başı Tarihi")
-                bas_str = tar.strftime('%d/%m/%Y')
-                bit_str = donus.strftime('%d/%m/%Y')
+                don = st.date_input("İş Başı")
+                bas_str, bit_str = tar.strftime('%d/%m/%Y'), don.strftime('%d/%m/%Y')
         
         if st.form_submit_button("TALEBİ GÖNDER"):
             if ad and tc:
                 p_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str}
                 requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
-                st.success("Talebiniz iletildi!")
-                st.balloons()
-            else:
-                st.error("Lütfen tüm alanları doldurun.")
+                st.success("Talebiniz iletildi!"); st.balloons()
 
 else:
     st.title("🔐 YÖNETİCİ KONTROL PANELİ")
     sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
-    
     if sifre == "1234":
         df = verileri_yukle()
-        tab1, tab2 = st.tabs(["📊 Aylık Personel Karnesi", "📝 Manuel İzin Girişi"])
-        
-        with tab1:
+        t1, t2 = st.tabs(["📊 Aylık Karne", "📝 Manuel Giriş"])
+        with t1:
             if not df.empty:
-                ay_liste = df['Ay_Ismi'].dropna().unique()
-                if len(ay_liste) > 0:
-                    aylar = sorted(ay_liste, reverse=True)
-                    sec_ay = st.selectbox("Ay Seçin", aylar)
-                    ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
-                    
-                    karne = ay_df.groupby('Ad Soyad').agg({'Gun_Deger': 'sum', 'Saat_Deger': 'sum', 'Tür': 'count'})
-                    karne.columns = ['Toplam Gün', 'Toplam Saat', 'Kayıt Sayısı']
-                    
-                    # Sayıları temizle (2.0 -> 2)
-                    karne['Toplam Gün'] = karne['Toplam Gün'].apply(lambda x: int(x) if x == int(x) else round(x, 1))
-                    karne['Toplam Saat'] = karne['Toplam Saat'].apply(lambda x: int(x) if x == int(x) else round(x, 1))
-                    
-                    st.subheader(f"🗓️ {sec_ay} Personel Karnesi")
-                    st.table(karne)
-                    
-                    # --- İNDİRME BUTONU ---
-                    csv = karne.to_csv(index=True).encode('utf-8-sig')
-                    st.download_button(
-                        label="📥 Karneyi Excel (CSV) Olarak İndir",
-                        data=csv,
-                        file_name=f"Karne_{sec_ay.replace(' ','_')}.csv",
-                        mime='text/csv',
-                    )
-                    
-                    st.write("---")
-                    st.write("🔍 **Detaylı Hareket Listesi**")
-                    st.dataframe(ay_df[['Ad Soyad', 'Tür', 'Başlangıç', 'Dönüş', 'Gun_Deger', 'Saat_Deger']])
-                else:
-                    st.info("Bu ay için veri bulunamadı.")
-            else:
-                st.info("Veritabanı boş.")
-
-        with tab2:
-            st.subheader("📝 Manuel İzin Girişi")
-            m_ad = st.text_input("Personel Adı Soyadı")
-            m_tip = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], key="m_key_indir_v2")
-            
-            with st.form("m_form_indir_v2"):
-                m_tur = st.selectbox("İzin Türü", IZIN_LISTESI)
-                m_tar = st.date_input("İzin Tarihi")
+                aylar = sorted(df['Ay_Ismi'].dropna().unique(), reverse=True)
+                sec_ay = st.selectbox("Ay Seçin", aylar)
+                ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
+                karne = ay_df.groupby('Ad Soyad').agg({'Gun_Deger': 'sum', 'Saat_Deger': 'sum', 'Tür': 'count'})
+                karne.columns = ['Toplam Gün', 'Toplam Saat', 'Kayıt Sayısı']
+                # Sayıları temizleme
+                for c in ['Toplam Gün', 'Toplam Saat']: karne[c] = karne[c].apply(lambda x: int(x) if x == int(x) else round(x, 1))
+                st.table(karne)
+                st.download_button("📥 Karneyi İndir (CSV)", karne.to_csv().encode('utf-8-sig'), f"Karne_{sec_ay}.csv", "text/csv")
+                st.write("---"); st.dataframe(ay_df[['Ad Soyad', 'Tür', 'Başlangıç', 'Dönüş', 'Gun_Deger', 'Saat_Deger']])
+            else: st.info("Veri yok.")
+        with t2:
+            m_ad = st.text_input("Personel Adı")
+            m_tip = st.radio("Tip", ["Tam Gün", "Saatlik"], key="admin_tip")
+            with st.form("m_form"):
+                m_tur, m_tar = st.selectbox("Tür", IZIN_LISTESI), st.date_input("Tarih")
                 if m_tip == "Saatlik":
-                    m_s1, m_s2 = st.time_input("Başla"), st.time_input("Bitir")
-                    m_bas = f"{m_tar.strftime('%d/%m/%Y')} {m_s1.strftime('%H:%M')}"
-                    m_bit = f"{m_tar.strftime('%d/%m/%Y
+                    ms1, ms2 = st.time_input("Başla"), st.time_input("Bitir")
+                    m_bas, m_bit = f"{m_tar.strftime('%d/%m/%Y
