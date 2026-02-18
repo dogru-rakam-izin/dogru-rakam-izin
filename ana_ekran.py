@@ -27,14 +27,14 @@ def verileri_yukle():
             try:
                 if "Saatlik" in str(row['Tür']):
                     fmt = "%d/%m/%Y %H:%M"
-                    bas = datetime.strptime(row['Başlangıç'], fmt)
-                    bit = datetime.strptime(row['Dönüş'], fmt)
+                    bas = datetime.strptime(str(row['Başlangıç']), fmt)
+                    bit = datetime.strptime(str(row['Dönüş']), fmt)
                     fark = bit - bas
                     return float(round(fark.seconds / 3600, 1))
                 else:
                     fmt = "%d/%m/%Y"
-                    bas = datetime.strptime(row['Başlangıç'], fmt)
-                    bit = datetime.strptime(row['Dönüş'], fmt)
+                    bas = datetime.strptime(str(row['Başlangıç']), fmt)
+                    bit = datetime.strptime(str(row['Dönüş']), fmt)
                     fark = (bit - bas).days
                     return int(fark)
             except:
@@ -65,8 +65,39 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
             tar = st.date_input("İzin Tarihi")
             if tip == "Saatlik":
                 s1, s2 = st.columns(2)
-                saat1 = s1.time_input("Çıkış")
-                saat2 = s2.time_input("Dönüş")
+                saat1 = s1.time_input("Çıkış Saati")
+                saat2 = s2.time_input("Dönüş Saati")
                 bas, bit = f"{tar.strftime('%d/%m/%Y')} {saat1.strftime('%H:%M')}", f"{tar.strftime('%d/%m/%Y')} {saat2.strftime('%H:%M')}"
             else:
                 donus = st.date_input("İş Başı Tarihi")
+                bas, bit = tar.strftime('%d/%m/%Y'), donus.strftime('%d/%m/%Y')
+        
+        onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
+        submit = st.form_submit_button("TALEBİ GÖNDER") # FORM BUTONU BURADA
+        
+        if submit:
+            if ad and tc and onay:
+                p = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur} ({tip})", "bas": bas, "bit": bit}
+                requests.post(APPS_SCRIPT_URL, data=json.dumps(p))
+                st.success("Talebiniz başarıyla iletildi.")
+                st.balloons()
+
+else:
+    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
+    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
+    
+    if sifre == "1234":
+        df = verileri_yukle()
+        if not df.empty:
+            tab1, tab2 = st.tabs(["📊 Aylık Personel Özeti", "📝 Manuel İzin Girişi"])
+            
+            with tab1:
+                aylar = sorted(df['Ay_Ismi'].dropna().unique())
+                if aylar:
+                    sec_ay = st.selectbox("Analiz Edilecek Ayı Seçin", aylar)
+                    ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
+                    
+                    ay_df['Günlük'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" not in str(x['Tür']) else 0, axis=1)
+                    ay_df['Saatlik'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" in str(x['Tür']) else 0, axis=1)
+                    
+                    ozet = ay_df.groupby('Ad Soyad').agg({'Günlük': '
