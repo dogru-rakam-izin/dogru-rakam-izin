@@ -18,7 +18,16 @@ def yukle():
     try:
         df = pd.read_csv(CSV)
         if df.empty: return pd.DataFrame()
+        # Sütun isimlerindeki boşlukları temizle
         df.columns = [c.strip() for c in df.columns]
+        
+        # Gerekli sütunlar var mı kontrol et
+        gerekliler = ["Ad Soyad", "Tür", "Başlangıç", "Dönüş"]
+        for g in gerekliler:
+            if g not in df.columns:
+                st.error(f"Eksik Sütun: {g}. Lütfen Google Sheets başlığını kontrol edin.")
+                return pd.DataFrame()
+
         def h(r):
             try:
                 f = "%d/%m/%Y %H:%M" if "Saatlik" in str(r['Tür']) else "%d/%m/%Y"
@@ -26,10 +35,14 @@ def yukle():
                 if "Saatlik" in str(r['Tür']): return 0, round((d-b).seconds/3600,1)
                 return (d-b).days, 0
             except: return 0, 0
+            
         df[['G', 'S']] = df.apply(lambda r: pd.Series(h(r)), axis=1)
-        df['Ay'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True).dt.strftime('%B').map(TR)
+        df['T'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
+        df['Ay'] = df['T'].dt.strftime('%B').map(TR) + " " + df['T'].dt.strftime('%Y')
         return df
-    except: return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Bağlantı Hatası: {e}")
+        return pd.DataFrame()
 
 m = st.sidebar.radio("MENÜ", ["⬇️ PERSONEL", "🔐 YÖNETİCİ"])
 
@@ -43,28 +56,31 @@ if m == "⬇️ PERSONEL":
             s1, s2 = st.time_input("Çıkış"), st.time_input("Dönüş")
             b, d = f"{t2.strftime('%d/%m/%Y')} {s1.strftime('%H:%M')}", f"{t2.strftime('%d/%m/%Y')} {s2.strftime('%H:%M')}"
         else:
-            dn = st.date_input("Dönüş")
+            dn = st.date_input("İş Başı")
             b, d = t2.strftime('%d/%m/%Y'), dn.strftime('%d/%m/%Y')
         if st.form_submit_button("GÖNDER") and ad:
             requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}))
-            st.success("OK"); st.balloons()
+            st.success("İletildi!"); st.balloons()
 
 else:
     st.title("🔐 YÖNETİCİ")
     if st.sidebar.text_input("Şifre", type="password") == "1234":
         df = yukle()
         if not df.empty:
-            t1, t2, t3 = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel"])
-            with t1:
-                ay = st.selectbox("Ay", sorted(df['Ay'].dropna().unique()))
-                kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
-                st.table(kn)
-            with t2:
+            tab1, tab2, tab3 = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel"])
+            with tab1:
+                ay_l = df['Ay'].dropna().unique()
+                if len(ay_l) > 0:
+                    ay = st.selectbox("Ay", sorted(ay_l, reverse=True))
+                    kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
+                    st.table(kn)
+                else: st.info("Ay bilgisi bulunamadı.")
+            with tab2:
                 p = st.selectbox("Kişi", sorted(df['Ad Soyad'].unique()))
                 f = df[df['Ad Soyad']==p]
                 st.metric("Toplam Gün", int(f['G'].sum()))
                 st.dataframe(f[['Başlangıç','Dönüş','Tür','G','S']])
-            with t3:
+            with tab3:
                 ma, mt = st.text_input("İsim"), st.radio("Tip", ["Tam Gün", "Saatlik"])
                 with st.form("m"):
                     tr, ta = st.selectbox("Tür", IZ), st.date_input("Tarih")
@@ -76,5 +92,5 @@ else:
                         mb, mi = ta.strftime('%d/%m/%Y'), md.strftime('%d/%m/%Y')
                     if st.form_submit_button("KAYDET") and ma:
                         requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":"0","ad":ma,"brans":"Y","tur":f"{tr} ({mt})","bas":mb,"bit":mi}))
-                        st.success("OK"); st.rerun()
-        else: st.warning("Veri Yok")
+                        st.success("Eklendi!"); st.rerun()
+        else: st.warning("Veritabanı boş veya sütunlar hatalı.")
