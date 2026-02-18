@@ -18,7 +18,7 @@ TR_AYLAR = {
     "September": "Eylül", "October": "Ekim", "November": "Kasım", "December": "Aralık"
 }
 
-# --- İZİN TÜRLERİ LİSTESİ ---
+# --- İZİN TÜRLERİ ---
 IZIN_LISTESI = [
     "Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", 
     "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", 
@@ -27,8 +27,18 @@ IZIN_LISTESI = [
 
 def verileri_yukle():
     try:
+        # Veriyi çek ve boşlukları temizle
         df = pd.read_csv(SHEET_READ_URL)
+        if df.empty:
+            return pd.DataFrame()
+            
         df.columns = [c.strip() for c in df.columns]
+        
+        # Tarih Dönüşümü (Hata payını azaltmak için formatı zorluyoruz)
+        df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
+        
+        # Eğer tarih okunamadıysa satırı atla
+        df = df.dropna(subset=['Tarih_Obj'])
         
         def sure_hesapla(row):
             try:
@@ -48,12 +58,12 @@ def verileri_yukle():
                 return 0
 
         df['Sure_Deger'] = df.apply(sure_hesapla, axis=1)
-        df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay_Ing'] = df['Tarih_Obj'].dt.strftime('%B')
         df['Yil'] = df['Tarih_Obj'].dt.strftime('%Y')
         df['Ay_Ismi'] = df['Ay_Ing'].map(TR_AYLAR) + " " + df['Yil']
         return df
-    except:
+    except Exception as e:
+        st.error(f"Veri yükleme hatası: {e}")
         return pd.DataFrame()
 
 # --- MENÜ ---
@@ -66,7 +76,7 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("personel_formu_v_son"):
+    with st.form("personel_formu_v4"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
@@ -85,4 +95,17 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
                 bit_str = donus.strftime('%d/%m/%Y')
         
         onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
-        submit = st.form_submit_button
+        submit = st.form_submit_button("TALEBİ GÖNDER")
+        
+        if submit:
+            if ad and tc and onay:
+                p_data = {
+                    "tarih": datetime.now().strftime("%d/%m/%Y"),
+                    "tc": str(tc), "ad": ad, "brans": "Personel",
+                    "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str
+                }
+                requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
+                st.success(f"Talebiniz ({tur}) başarıyla iletildi.")
+                st.balloons()
+            else:
+                st.warning
