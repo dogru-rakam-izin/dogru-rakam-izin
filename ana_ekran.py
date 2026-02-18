@@ -30,6 +30,7 @@ def verileri_yukle():
                     bas = datetime.strptime(str(row['Başlangıç']), fmt)
                     bit = datetime.strptime(str(row['Dönüş']), fmt)
                     fark = bit - bas
+                    # Saniyeyi saate çevir ve 1 ondalık bırak
                     return float(round(fark.seconds / 3600, 1))
                 else:
                     fmt = "%d/%m/%Y"
@@ -55,12 +56,12 @@ menu = st.sidebar.radio("MENÜ SEÇİMİ", ["⬇️ PERSONEL İZİN TALEBİ", "�
 if menu == "⬇️ PERSONEL İZİN TALEBİ":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
     
-    # SAAT ÇIKMAMA SORUNUNU ÇÖZEN YER: Form dışına aldık veya interaktif yaptık
+    # SAAT SORUNUNU ÇÖZEN KRİTİK NOKTA: 'tip' seçimi formun dışında olmalı
     ad = st.text_input("Ad Soyad")
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("personel_formu_detay"):
+    with st.form("personel_formu_vfinal"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("Tür", ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin"])
@@ -68,17 +69,4 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
             
         with f2:
             if tip == "Saatlik":
-                s1, s2 = st.columns(2)
-                saat1 = s1.time_input("Çıkış Saati")
-                saat2 = s2.time_input("Dönüş Saati")
-                bas, bit = f"{tar.strftime('%d/%m/%Y')} {saat1.strftime('%H:%M')}", f"{tar.strftime('%d/%m/%Y')} {saat2.strftime('%H:%M')}"
-            else:
-                donus = st.date_input("İş Başı Tarihi")
-                bas, bit = tar.strftime('%d/%m/%Y'), donus.strftime('%d/%m/%Y')
-        
-        onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
-        submit = st.form_submit_button("TALEBİ GÖNDER")
-        
-        if submit:
-            if ad and tc and onay:
-                p = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad
+                s
