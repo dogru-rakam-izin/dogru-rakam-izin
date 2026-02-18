@@ -55,12 +55,12 @@ menu = st.sidebar.radio("MENÜ SEÇİMİ", ["⬇️ PERSONEL İZİN TALEBİ", "�
 if menu == "⬇️ PERSONEL İZİN TALEBİ":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
     
-    # Seçim formun dışında olmalı ki sayfa anında yenilenip saatleri getirsin
+    # SAAT KUTULARININ GÖRÜNMESİ İÇİN: Seçim formun dışında olmalı
     ad = st.text_input("Ad Soyad")
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("personel_formu_kesin_son"):
+    with st.form("personel_izin_formu"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("Tür", ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin"])
@@ -83,6 +83,76 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
         
         if submit:
             if ad and tc and onay:
-                # Syntax hatasını düzelten tam sözlük yapısı:
+                # Sözlük yapısı hatasız ve tam:
                 p_data = {
-                    "tari
+                    "tarih": datetime.now().strftime("%d/%m/%Y"),
+                    "tc": str(tc),
+                    "ad": ad,
+                    "brans": "Personel",
+                    "tur": f"{tur} ({tip})",
+                    "bas": bas_str,
+                    "bit": bit_str
+                }
+                requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
+                st.success("Talebiniz başarıyla iletildi.")
+                st.balloons()
+            else:
+                st.warning("Lütfen tüm alanları doldurun ve onaylayın.")
+
+else:
+    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
+    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
+    
+    if sifre == "1234":
+        df = verileri_yukle()
+        if not df.empty:
+            tab1, tab2 = st.tabs(["📊 Aylık Personel Özeti", "📝 Manuel İzin Girişi"])
+            
+            with tab1:
+                aylar = sorted(df['Ay_Ismi'].dropna().unique())
+                if aylar:
+                    sec_ay = st.selectbox("İncelemek İstediğiniz Ayı Seçin", aylar)
+                    ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
+                    
+                    ay_df['Günlük'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" not in str(x['Tür']) else 0, axis=1)
+                    ay_df['Saatlik'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" in str(x['Tür']) else 0, axis=1)
+                    
+                    ozet = ay_df.groupby('Ad Soyad').agg({'Günlük': 'sum', 'Saatlik': 'sum', 'Tür': 'count'})
+                    ozet.columns = ['Toplam Gün', 'Toplam Saat', 'İzin Adedi']
+                    
+                    # 5.0 gibi rakamları 5 yapıyoruz:
+                    ozet['Toplam Gün'] = ozet['Toplam Gün'].astype(int)
+                    ozet['Toplam Saat'] = ozet['Toplam Saat'].apply(lambda x: int(x) if x == int(x) else x)
+
+                    st.subheader(f"🗓️ {sec_ay} Personel Karnesi")
+                    st.table(ozet)
+                    
+                    csv = ozet.to_csv(index=True).encode('utf-16')
+                    st.download_button(label="📥 Bu Listeyi İndir", data=csv, file_name=f"{sec_ay}_ozet.csv", mime="text/csv")
+            
+            with tab2:
+                y_ad = st.text_input("Personel Ad Soyad")
+                y_tip = st.radio("İzin Tipi", ["Tam Gün", "Saatlik"], horizontal=True, key="admin_tip")
+                
+                with st.form("admin_manuel_ekleme"):
+                    y_tur = st.selectbox("İzin Türü", ["Yıllık İzin", "Mazeret", "Saatlik", "Rapor"])
+                    y_tar = st.date_input("Tarih")
+                    
+                    if y_tip == "Saatlik":
+                        c1, c2 = st.columns(2)
+                        y_s1 = c1.time_input("Başlangıç Saati")
+                        y_s2 = c2.time_input("Bitiş Saati")
+                        y_bas, y_bit = f"{y_tar.strftime('%d/%m/%Y')} {y_s1.strftime('%H:%M')}", f"{y_tar.strftime('%d/%m/%Y')} {y_s2.strftime('%H:%M')}"
+                    else:
+                        y_don = st.date_input("İş Başı")
+                        y_bas, y_bit = y_tar.strftime('%d/%m/%Y'), y_don.strftime('%d/%m/%Y')
+                    
+                    if st.form_submit_button("Sisteme Kaydet"):
+                        p_y = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": "---", "ad": y_ad, "brans": "Yönetici", "tur": f"{y_tur} ({y_tip})", "bas": y_bas, "bit": y_bit}
+                        requests.post(APPS_SCRIPT_URL, data=json.dumps(p_y))
+                        st.success("Kayıt veritabanına eklendi!")
+                        st.rerun()
+        else:
+            st.warning("Veritabanı boş.")
+    elif sifre != "":
+        st.error("Hatalı Giriş Şifresi!")
