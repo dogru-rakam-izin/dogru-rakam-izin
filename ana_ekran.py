@@ -33,25 +33,21 @@ def verileri_yukle():
         
         def sure_ayristir(row):
             try:
-                # Tür sütununda 'Saatlik' ifadesi geçiyorsa saat olarak hesapla
                 if "Saatlik" in str(row['Tür']):
                     fmt = "%d/%m/%Y %H:%M"
                     bas = datetime.strptime(str(row['Başlangıç']), fmt)
                     bit = datetime.strptime(str(row['Dönüş']), fmt)
                     fark = bit - bas
-                    return 0, float(round(fark.seconds / 3600, 1)) # (Gün, Saat)
+                    return 0, float(round(fark.seconds / 3600, 1))
                 else:
-                    # Tam gün izinler
                     fmt = "%d/%m/%Y"
                     bas = datetime.strptime(str(row['Başlangıç']), fmt)
                     bit = datetime.strptime(str(row['Dönüş']), fmt)
                     fark = (bit - bas).days
-                    return int(fark), 0 # (Gün, Saat)
+                    return int(fark), 0
             except: return 0, 0
 
-        # İzinleri Gün ve Saat olarak iki ayrı sütuna ayırıyoruz
         df[['Gun_Deger', 'Saat_Deger']] = df.apply(lambda r: pd.Series(sure_ayristir(r)), axis=1)
-        
         df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay_Ismi'] = df['Tarih_Obj'].dt.strftime('%B').map(TR_AYLAR) + " " + df['Tarih_Obj'].dt.strftime('%Y')
         return df
@@ -65,7 +61,7 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("p_form_new"):
+    with st.form("p_form_ayristirilmis"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
@@ -83,11 +79,4 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
         
         if st.form_submit_button("TALEBİ GÖNDER"):
             if ad and tc:
-                p_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str}
-                requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
-                st.success("Talebiniz başarıyla iletildi!")
-                st.balloons()
-
-else:
-    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
-    s
+                p_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "
