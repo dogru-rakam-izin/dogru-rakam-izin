@@ -108,4 +108,61 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
                 st.success(f"Talebiniz ({tur}) başarıyla iletildi.")
                 st.balloons()
             else:
-                st.warning
+                st.warning("Lütfen tüm alanları doldurun.")
+
+else:
+    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
+    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
+    
+    if sifre == "1234":
+        df = verileri_yukle()
+        
+        if df is not None and not df.empty:
+            tab1, tab2 = st.tabs(["📊 Aylık Personel Karnesi", "📝 Manuel İzin Girişi"])
+            
+            with tab1:
+                aylar = sorted(df['Ay_Ismi'].unique(), reverse=True)
+                sec_ay = st.selectbox("İncelemek İstediğiniz Ayı Seçin", aylar)
+                
+                ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
+                
+                # Hesaplamalar
+                ay_df['Günlük'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" not in str(x['Tür']) else 0, axis=1)
+                ay_df['Saatlik'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" in str(x['Tür']) else 0, axis=1)
+                
+                karne = ay_df.groupby('Ad Soyad').agg({'Günlük': 'sum', 'Saatlik': 'sum', 'Tür': 'count'})
+                karne.columns = ['Toplam Gün', 'Toplam Saat', 'Kayıt Adedi']
+                
+                st.subheader(f"🗓️ {sec_ay} Personel Karnesi")
+                st.table(karne)
+                
+                st.write("---")
+                st.write("🔍 **Detaylı Hareket Listesi:**")
+                st.dataframe(ay_df[['Ad Soyad', 'Tür', 'Başlangıç', 'Dönüş', 'Sure_Deger']])
+            
+            with tab2:
+                y_ad = st.text_input("Personel Ad Soyad")
+                y_tip = st.radio("İzin Tipi (Admin)", ["Tam Gün", "Saatlik"], horizontal=True)
+                
+                with st.form("admin_manuel_form_v4"):
+                    y_tur = st.selectbox("İzin Türü", IZIN_LISTESI)
+                    y_tar = st.date_input("Tarih")
+                    
+                    if y_tip == "Saatlik":
+                        c1, c2 = st.columns(2)
+                        y_s1 = c1.time_input("Başla")
+                        y_s2 = c2.time_input("Bitir")
+                        y_bas, y_bit = f"{y_tar.strftime('%d/%m/%Y')} {y_s1.strftime('%H:%M')}", f"{y_tar.strftime('%d/%m/%Y')} {y_s2.strftime('%H:%M')}"
+                    else:
+                        y_don = st.date_input("İş Başı")
+                        y_bas, y_bit = y_tar.strftime('%d/%m/%Y'), y_don.strftime('%d/%m/%Y')
+                    
+                    if st.form_submit_button("Sisteme Kaydet"):
+                        p_y = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": "---", "ad": y_ad, "brans": "Yönetici", "tur": f"{y_tur} ({y_tip})", "bas": y_bas, "bit": y_bit}
+                        requests.post(APPS_SCRIPT_URL, data=json.dumps(p_y))
+                        st.success("Kayıt başarıyla eklendi!")
+                        st.rerun()
+        else:
+            st.warning("Henüz hiç kayıt bulunamadı veya Google Sheets bağlantısı bekleniyor. Lütfen 'Personel İzin Talebi' kısmından bir deneme kaydı oluşturun.")
+    elif sifre != "":
+        st.error("Hatalı Giriş Şifresi!")
