@@ -14,7 +14,7 @@ st.set_page_config(page_title="Doğru Rakam İzin Sistemi", layout="wide")
 # Türkçe Ay Sözlüğü
 TR_AYLAR = {
     "January": "Ocak", "February": "Şubat", "March": "Mart", "April": "Nisan",
-    "May": "Mayıs", "June": "Haziran", "July": "Temmuz", "August": "Aralık",
+    "May": "Mayıs", "June": "Haziran", "July": "Temmuz", "August": "Ağustos",
     "September": "Eylül", "October": "Ekim", "November": "Kasım", "December": "Aralık"
 }
 
@@ -61,7 +61,7 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("p_form_indir_v1"):
+    with st.form("p_form_indir_v2"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
@@ -83,6 +83,8 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
                 requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
                 st.success("Talebiniz iletildi!")
                 st.balloons()
+            else:
+                st.error("Lütfen tüm alanları doldurun.")
 
 else:
     st.title("🔐 YÖNETİCİ KONTROL PANELİ")
@@ -94,13 +96,16 @@ else:
         
         with tab1:
             if not df.empty:
-                aylar = sorted(df['Ay_Ismi'].dropna().unique(), reverse=True)
-                if aylar:
+                ay_liste = df['Ay_Ismi'].dropna().unique()
+                if len(ay_liste) > 0:
+                    aylar = sorted(ay_liste, reverse=True)
                     sec_ay = st.selectbox("Ay Seçin", aylar)
                     ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
                     
                     karne = ay_df.groupby('Ad Soyad').agg({'Gun_Deger': 'sum', 'Saat_Deger': 'sum', 'Tür': 'count'})
                     karne.columns = ['Toplam Gün', 'Toplam Saat', 'Kayıt Sayısı']
+                    
+                    # Sayıları temizle (2.0 -> 2)
                     karne['Toplam Gün'] = karne['Toplam Gün'].apply(lambda x: int(x) if x == int(x) else round(x, 1))
                     karne['Toplam Saat'] = karne['Toplam Saat'].apply(lambda x: int(x) if x == int(x) else round(x, 1))
                     
@@ -120,5 +125,19 @@ else:
                     st.write("🔍 **Detaylı Hareket Listesi**")
                     st.dataframe(ay_df[['Ad Soyad', 'Tür', 'Başlangıç', 'Dönüş', 'Gun_Deger', 'Saat_Deger']])
                 else:
-                    st.info("Bu ay için kayıt bulunamadı.")
+                    st.info("Bu ay için veri bulunamadı.")
             else:
+                st.info("Veritabanı boş.")
+
+        with tab2:
+            st.subheader("📝 Manuel İzin Girişi")
+            m_ad = st.text_input("Personel Adı Soyadı")
+            m_tip = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], key="m_key_indir_v2")
+            
+            with st.form("m_form_indir_v2"):
+                m_tur = st.selectbox("İzin Türü", IZIN_LISTESI)
+                m_tar = st.date_input("İzin Tarihi")
+                if m_tip == "Saatlik":
+                    m_s1, m_s2 = st.time_input("Başla"), st.time_input("Bitir")
+                    m_bas = f"{m_tar.strftime('%d/%m/%Y')} {m_s1.strftime('%H:%M')}"
+                    m_bit = f"{m_tar.strftime('%d/%m/%Y
