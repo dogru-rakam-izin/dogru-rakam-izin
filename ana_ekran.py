@@ -4,7 +4,7 @@ import requests
 import json
 from datetime import datetime
 
-# --- AYARLAR ---
+# --- YAPILANDIRMA ---
 URL = "https://script.google.com/macros/s/AKfycbyz1FkOaVRpkSAQoJrhaZcXsu_qQuYN-Y18S-yQblLIUqGBlFgoryoNW4eLfw8d0DZ1/exec"
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
@@ -32,15 +32,27 @@ def yukle():
         return df
     except: return pd.DataFrame()
 
-# Yazdırma fonksiyonu (HTML/JS kullanarak)
 def yazdir_html(baslik, icerik):
     html = f"""
     <html>
-    <head><title>{baslik}</title></head>
-    <body onload="window.print()">
-        <div style="font-family: Arial; padding: 40px; line-height: 1.6;">
-            <h2 style="text-align: center;">{baslik}</h2>
-            <pre style="white-space: pre-wrap; font-family: Arial; font-size: 14px;">{icerik}</pre>
+    <head>
+        <style>
+            @page {{ size: A4; margin: 20mm; }}
+            body {{ font-family: 'Times New Roman', serif; line-height: 1.6; color: #000; }}
+            .paper {{ padding: 10px; }}
+            .header {{ text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 30px; text-transform: uppercase; }}
+            .content {{ white-space: pre-wrap; font-size: 14px; text-align: justify; }}
+            .footer {{ margin-top: 50px; }}
+            @media print {{ 
+                header, footer, .no-print {{ display: none !important; }} 
+                body {{ margin: 0; }}
+            }}
+        </style>
+    </head>
+    <body onload="window.print();">
+        <div class="paper">
+            <div class="header">{baslik}</div>
+            <div class="content">{icerik}</div>
         </div>
     </body>
     </html>
@@ -67,54 +79,49 @@ if m == "⬇️ PERSONEL":
 
 else:
     st.title("🔐 YÖNETİCİ PANELİ")
-    if st.sidebar.text_input("Giriş Şifresi", type="password") == "1234":
+    if st.sidebar.text_input("Şifre", type="password") == "1234":
         df = yukle()
-        tabs = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel Kayıt", "📄 Formlar"])
+        tabs = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "📄 Formlar"])
         
-        with tabs[0]: # KARNE
+        with tabs[0]:
             if not df.empty:
-                ay = st.selectbox("Görüntülenecek Ay", sorted(df['Ay'].dropna().unique(), reverse=True))
+                ay = st.selectbox("Ay", sorted(df['Ay'].dropna().unique(), reverse=True))
                 kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
-                kn.columns = ['Ad Soyad', 'İzin Türü', 'Gün', 'Saat']
-                st.table(kn.style.format({"Gün": "{:.1f}", "Saat": "{:.1f}"}))
-            else: st.warning("Veri bulunamadı.")
+                st.table(kn.style.format({"G": "{:.1f}", "S": "{:.1f}"}))
 
-        with tabs[1]: # SİCİL
+        with tabs[1]:
             if not df.empty:
-                p = st.selectbox("Personel Seç", sorted(df['Ad Soyad'].unique()))
+                p = st.selectbox("Personel", sorted(df['Ad Soyad'].unique()))
                 f = df[df['Ad Soyad']==p]
-                st.metric("Toplam Kullanılan Gün", f"{f['G'].sum():.1f}")
-                st.dataframe(f[['Başlangıç','Dönüş','Tür','G','S']].style.format({"G": "{:.1f}", "S": "{:.1f}"}))
+                st.metric("Toplam Gün", f"{f['G'].sum():.1f}")
+                st.dataframe(f[['Başlangıç','Dönüş','Tür','G','S']])
 
-        with tabs[2]: # MANUEL
-            ma, mt = st.text_input("Kayıt Edilecek İsim"), st.radio("Tip", ["Tam Gün", "Saatlik"])
+        with tabs[2]:
+            ma, mt = st.text_input("İsim"), st.radio("Tip", ["Tam Gün", "Saatlik"])
             with st.form("m"):
                 tr, ta = st.selectbox("Tür", IZ), st.date_input("Tarih")
                 if mt == "Saatlik":
-                    m1, m2 = st.time_input("Başla"), st.time_input("Bitir")
+                    m1, m2 = st.time_input("B-Saat"), st.time_input("D-Saat")
                     mb, mi = f"{ta.strftime('%d/%m/%Y')} {m1.strftime('%H:%M')}", f"{ta.strftime('%d/%m/%Y')} {m2.strftime('%H:%M')}"
                 else:
                     md = st.date_input("Dönüş")
                     mb, mi = ta.strftime('%d/%m/%Y'), md.strftime('%d/%m/%Y')
-                if st.form_submit_button("SİSTEME İŞLE") and ma:
+                if st.form_submit_button("KAYDET") and ma:
                     requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":"0","ad":ma,"brans":"Y","tur":f"{tr} ({mt})","bas":mb,"bit":mi}))
-                    st.success("Kayıt eklendi!"); st.rerun()
+                    st.success("Eklendi!"); st.rerun()
 
-        with tabs[3]: # FORMLAR
-            st.subheader("Kurumsal İzin Formu Yazdır")
+        with tabs[3]:
+            st.subheader("Kurumsal Form Yazdır")
             c1, c2, c3 = st.columns(3)
-            
             with c1:
                 if st.button("📄 PERSONEL İZİN FORMU"):
-                    metin = """DOĞRU RAKAM ÖZEL EĞİTİM VE REHABİLİTASYON MERKEZİ\nPERSONEL İZİN FORMU\n\nAdı Soyadı: .......................................\nTC No: ...........................................\nİzin Türü: [ ] Yıllık [ ] Mazeret [ ] Sağlık\nAyrılış: ..../..../2026\nDönüş: ..../..../2026\n\nİMZA: ......................."""
-                    yazdir_html("PERSONEL İZİN FORMU", metin)
-            
+                    m = """1. PERSONEL KİMLİK BİLGİLERİ\nAdı Soyadı: __________________________\nGörevi / Branşı: ______________________\nTC Kimlik No: ________________________\n\n2. İZİN / MAZERET BİLGİLERİ\nİzin Türü: [ ] Yıllık  [ ] Mazeret  [ ] Sağlık Raporu [ ] Ücretsiz\nAyrılış: .... / .... / 2026 - Saat: ____\nDönüş: .... / .... / 2026 - Saat: ____\nToplam Süre: ________ Gün ________ Saat\n\n3. EĞİTİM VE SEANS PLANLAMASI\n[ ] Telafi dersleri planlanmıştır.  [ ] Öğrenci velilerine bilgi verilmiştir.\n\n4. İLETİŞİM\nTelefon: __________________\nAdres: __________________________________________\n\n5. ONAY VE İMZA\nPersonel İmza: __________    Müdür/Kurucu Onay: [ ] [ ]"""
+                    yazdir_html("DOĞRU RAKAM ÖZEL EĞİTİM VE REHABİLİTASYON MERKEZİ", m)
             with c2:
                 if st.button("📄 ÜCRETSİZ İZİN"):
-                    metin = """DOĞRU RAKAM ÖZEL EĞİTİM MÜDÜRLÜĞÜ'NE\n\nŞahsi nedenlerimle ..../..../2026 tarihleri arasında ücretsiz izin kullanmak istiyorum. Bu süre zarfında ücret talep etmeyeceğimi beyan ederim.\n\nAd Soyad: .......................\nİmza: .........................."""
-                    yazdir_html("ÜCRETSİZ İZİN DİLEKÇESİ", metin)
-
+                    m = """Doğru Rakam Özel Eğitim ve Rehabilitasyon Merkezi Müdürlüğü’ne\n\nKurumunuzun .......................... branşındaki personelliyim. ... / ... / 2026 ile ... / ... / 2026 tarihleri arasında, şahsi nedenlerim dolayısıyla ÜCRETSİZ İZİN kullanmak istiyorum. Bu süre zarfında tarafıma herhangi bir ücret ödenmeyeceğini kabul ediyorum. İzin süresince seans planlamaları yapılmış olup derslerin aksamaması için gerekli önlemler alınmıştır.\n\nGereğini bilgilerinize arz ederim.\n\nTarih: ... / ... / 2026\nİsim/İmza: __________________________"""
+                    yazdir_html("ÜCRETSİZ İZİN DİLEKÇESİ", m)
             with c3:
                 if st.button("📄 YILLIK İZİN"):
-                    metin = """DOĞRU RAKAM ÖZEL EĞİTİM MÜDÜRLÜĞÜ'NE\n\n4857 Sayılı Kanun uyarınca yıllık ücretli izin hakkımı kullanmak istiyorum.\nİzin Başlangıç: ..../..../2026\nİşe Başlama: ..../..../2026\n\nAd Soyad: .......................\nİmza: .........................."""
-                    yazdir_html("YILLIK İZİN DİLEKÇESİ", metin)
+                    m = """DOĞRU RAKAM ÖZEL EĞİTİM VE REHABİLİTASYON MERKEZİ MÜDÜRLÜĞÜ’NE\n\nKurumunuzda .................................... T.C. Kimlik numarası ile görev yapmaktayım. 4857 Sayılı İş Kanunu’ndan doğan yıllık ücretli izin hakkımın aşağıda belirtilen tarihler arasında kullandırılmasını talep etmekteyim.\n\nİzin Başlangıç Tarihi: .... / .... / 2026\nİşe Başlama Tarihi: .... / .... / 2026\n\nİletişim Bilgileri:\nTelefon: ................................\nAdres: .............................................................\n\nTarih: .... / .... / 2026\nAd Soyad: ........................  İmza: .....................\n\nONAY: [ ] Uygun Görülmüştür [ ] Uygun Görülmemiştir"""
+                    yazdir_html("YILLIK İZİN DİLEKÇESİ", m)
