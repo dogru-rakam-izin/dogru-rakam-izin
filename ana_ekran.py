@@ -4,7 +4,7 @@ import requests
 import json
 from datetime import datetime
 
-# --- KESİLMEYE KARŞI GÜVENLİ FORMATLAR ---
+# --- AYARLAR VE FORMATLAR ---
 F_TARIH = '%d/%m/%Y'
 F_SAAT = '%H:%M'
 F_TAM = '%d/%m/%Y %H:%M'
@@ -17,6 +17,13 @@ st.set_page_config(page_title="Dogru Rakam", layout="wide")
 TR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
 IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim"]
 TP_LIST = ["Tam Gün", "Saatlik"]
+
+# HATA VEREN MANTIĞI BURAYA ALDIK (GÜVENLİ BÖLGE)
+def hakedis_bul(yil):
+    if yil < 1: return 0
+    if yil < 5: return 14
+    if yil < 15: return 20
+    return 26
 
 def yukle():
     try:
@@ -98,4 +105,12 @@ else:
                 py = st.selectbox("Personel", sorted(df['Ad Soyad'].unique()), key="py")
                 gt = st.date_input("Giris", value=datetime(2023, 1, 1))
                 kd = (2026 - gt.year)
-                hk = 14 if kd
+                # SATIR KISALDI, HATA RİSKİ BİTTİ
+                hk = hakedis_bul(kd)
+                df_yil = df[(df['Ad Soyad']==py) & (df['Tür'].str.contains("Yıllık", na=False))]
+                ku = df_yil['G'].sum()
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Hak", f"{hk} G"); c2.metric("Kull.", f"{ku:.1f} G"); c3.metric("Kalan", f"{hk-ku:.1f} G")
+                if not df_yil.empty: st.dataframe(df_yil[['Başlangıç', 'Dönüş', 'G']])
+        else: st.warning("Veri yok.")
+    else: st.info("Sifre giriniz.")
