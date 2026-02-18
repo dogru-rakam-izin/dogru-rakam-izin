@@ -47,7 +47,7 @@ if menu == "⬇️ PERSONEL":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
     ad, tc = st.text_input("Ad Soyad"), st.text_input("TC", max_chars=11)
     tip = st.radio("Süre", ["Tam Gün", "Saatlik"], horizontal=True)
-    with st.form("p_form_sicil"):
+    with st.form("p_form"):
         f1, f2 = st.columns(2)
         with f1: tur, tar = st.selectbox("Tür", IZIN_LISTESI), st.date_input("Tarih")
         with f2:
@@ -68,28 +68,10 @@ else:
     sifre = st.sidebar.text_input("Şifre", type="password")
     if sifre == "1234":
         df = verileri_yukle()
-        t1, t2, t3 = st.tabs(["📊 Aylık Karne", "👤 Personel Sicil Kartı", "📝 Manuel Kayıt"])
-        
+        t1, t2, t3 = st.tabs(["📊 Aylık Karne", "👤 Personel Sicili", "📝 Manuel Kayıt"])
         with t1:
             if not df.empty:
-                ay_liste = df['Ay_Ismi'].dropna().unique()
-                if len(ay_liste) > 0:
-                    sec_ay = st.selectbox("Ay Seçin", sorted(ay_liste, reverse=True))
-                    ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
-                    karne = ay_df.groupby(['Ad Soyad', 'Tür']).agg({'Gun_Deger': 'sum', 'Saat_Deger': 'sum'}).reset_index()
-                    karne.columns = ['Ad Soyad', 'İzin Türü', 'Toplam Gün', 'Toplam Saat']
-                    st.table(karne)
-                else: st.info("Veri yok.")
-            else: st.info("Veritabanı boş.")
-
-        with t2:
-            st.subheader("👤 Personel Bazlı Tüm Geçmiş")
-            if not df.empty:
-                personel_listesi = sorted(df['Ad Soyad'].unique())
-                sec_personel = st.selectbox("Personel Seçiniz", personel_listesi)
-                
-                p_gecmis = df[df['Ad Soyad'] == sec_personel].copy()
-                
-                # Özet Bilgi Kartları
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Toplam İ
+                aylar = sorted(df['Ay_Ismi'].dropna().unique(), reverse=True)
+                sec_ay = st.selectbox("Ay Seçin", aylar)
+                ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
+                karne = ay_df.groupby(['Ad Soyad', 'Tür']).agg({'Gun_Deger': 'sum', 'Saat_Deger': 'sum'}).reset_index()
