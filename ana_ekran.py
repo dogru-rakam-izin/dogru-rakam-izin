@@ -9,10 +9,10 @@ URL = "https://script.google.com/macros/s/AKfycbyz1FkOaVRpkSAQoJrhaZcXsu_qQuYN-Y
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
 
-st.set_page_config(page_title="Dogru Rakam", layout="wide")
+st.set_page_config(page_title="Doğru Rakam İzin", layout="wide")
 
 TR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
-IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin"]
+IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim"]
 
 def yukle():
     try:
@@ -21,12 +21,9 @@ def yukle():
         df.columns = [c.strip() for c in df.columns]
         def h(r):
             try:
-                f = "%d/%m/%Y"
-                if "Saatlik" in str(r['Tür']): f = "%d/%m/%Y %H:%M"
-                b = datetime.strptime(str(r['Başlangıç']), f)
-                d = datetime.strptime(str(r['Dönüş']), f)
-                if "Saatlik" in str(r['Tür']): 
-                    return 0, round((d-b).total_seconds()/3600, 1)
+                f = "%d/%m/%Y %H:%M" if "Saatlik" in str(r['Tür']) else "%d/%m/%Y"
+                b, d = datetime.strptime(str(r['Başlangıç']), f), datetime.strptime(str(r['Dönüş']), f)
+                if "Saatlik" in str(r['Tür']): return 0, round((d-b).total_seconds()/3600, 1)
                 return (d-b).days, 0
             except: return 0, 0
         df[['G', 'S']] = df.apply(lambda r: pd.Series(h(r)), axis=1)
@@ -35,57 +32,83 @@ def yukle():
         return df
     except: return pd.DataFrame()
 
-m = st.sidebar.radio("MENU", ["PERSONEL", "YONETICI"])
+def yazdir_html(baslik, icerik):
+    html = f"<html><head><style>body {{ font-family: 'Times New Roman'; padding: 40px; line-height: 1.6; }} .h {{ text-align: center; font-weight: bold; margin-bottom: 20px; }} .c {{ white-space: pre-wrap; }} @media print {{ .no {{ display: none; }} }} </style></head><body onload='window.print()'><div class='h'>{baslik}</div><div class='c'>{icerik}</div></body></html>"
+    st.components.v1.html(html, height=0)
 
-if m == "PERSONEL":
-    st.title("DOĞRU RAKAM İZİN SİSTEMİ")
-    ad = st.text_input("Ad Soyad")
-    tc = st.text_input("TC No")
-    with st.form("p_form"):
-        t1 = st.selectbox("İzin Türü", IZ)
-        t2 = st.date_input("Başlangıç Tarihi")
+m = st.sidebar.radio("MENÜ", ["⬇️ PERSONEL", "🔐 YÖNETİCİ"])
+
+if m == "⬇️ PERSONEL":
+    st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
+    ad, tc = st.text_input("Ad Soyad"), st.text_input("TC No", max_chars=11)
+    tp = st.radio("Süre", ["Tam Gün", "Saatlik"], horizontal=True)
+    with st.form("p"):
+        t1, t2 = st.selectbox("Tür", IZ), st.date_input("Başlangıç")
+        if tp == "Saatlik":
+            s1, s2 = st.time_input("Çıkış"), st.time_input("Dönüş")
+            b, d = f"{t2.strftime('%d/%m/%Y')} {s1.strftime('%H:%M')}", f"{t2.strftime('%d/%m/%Y')} {s2.strftime('%H:%M')}"
+        else:
+            dn = st.date_input("İş Başı")
+            b, d = t2.strftime('%d/%m/%Y'), dn.strftime('%d/%m/%Y')
         if st.form_submit_button("GÖNDER") and ad:
-            dt = datetime.now().strftime("%d/%m/%Y")
-            b_s = t2.strftime('%d/%m/%Y')
-            d = {"tarih":dt,"tc":tc,"ad":ad,"brans":"P","tur":t1,"bas":b_s,"bit":b_s}
-            requests.post(URL, data=json.dumps(d))
-            st.success("Talebiniz Gönderildi")
+            requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}))
+            st.success("İletildi!"); st.balloons()
 
 else:
     st.title("🔐 YÖNETİCİ PANELİ")
-    sifre = st.sidebar.text_input("Şifre", type="password")
-    if sifre == "1234":
+    if st.sidebar.text_input("Şifre", type="password") == "1234":
         df = yukle()
-        t = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel Kayıt", "📅 Yıllık İzin Takip"])
+        tabs = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "📄 Formlar", "📅 Yıllık İzin Takip"])
         
-        with t[0]:
+        with tabs[0]: # Karne
             if not df.empty:
-                ays = sorted(df['Ay'].dropna().unique(), reverse=True)
-                ay = st.selectbox("Ay Seç", ays)
-                st.table(df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum())
-        
-        with t[1]:
+                ay = st.selectbox("Ay", sorted(df['Ay'].dropna().unique(), reverse=True))
+                kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
+                st.table(kn.style.format({"G": "{:.1f}", "S": "{:.1f}"}))
+
+        with tabs[1]: # Sicil
             if not df.empty:
-                ps = sorted(df['Ad Soyad'].unique())
-                p = st.selectbox("Personel Seç", ps)
-                st.dataframe(df[df['Ad Soyad']==p])
+                p = st.selectbox("Personel", sorted(df['Ad Soyad'].unique()))
+                st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']])
 
-        with t[2]:
-            ma = st.text_input("Personel İsmi")
-            with st.form("m_f"):
-                m_t = st.selectbox("Tür ", IZ)
-                m_b = st.date_input("Başlangıç ")
-                if st.form_submit_button("SİSTEME KAYDET") and ma:
-                    st.success("Kaydedildi")
+        with tabs[2]: # Manuel Kayıt
+            ma = st.text_input("İsim")
+            with st.form("m"):
+                tr, ta, dn = st.selectbox("Tür ", IZ), st.date_input("Başla "), st.date_input("Dönüş ")
+                if st.form_submit_button("SİSTEME İŞLE") and ma:
+                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":"0","ad":ma,"brans":"Y","tur":tr,"bas":ta.strftime('%d/%m/%Y'),"bit":dn.strftime('%d/%m/%Y')}))
+                    st.success("Eklendi!"); st.rerun()
 
-        with t[4 if len(t)>4 else 3]:
+        with tabs[3]: # Formlar
+            st.subheader("Kurumsal Formlar")
+            if st.button("📄 PERSONEL İZİN FORMU"):
+                yazdir_html("DOĞRU RAKAM ÖZEL EĞİTİM", "PERSONEL İZİN FORMU\n\nAd Soyad: ____________\nTC: ____________\nİzin Türü: [ ] Yıllık [ ] Mazeret\n\nİmza: ________")
+
+        with tabs[4]: # Yıllık İzin Takip
             st.subheader("Yıllık İzin Hak ediş Hesaplama")
             if not df.empty:
-                plist = sorted(df['Ad Soyad'].unique())
-                py = st.selectbox("Personel Seç", plist, key="y_p")
-                gr = st.date_input("İşe Giriş Tarihi")
-                kd = (datetime.now().year - gr.year)
-                hk = 14 if kd < 5 else 20 if kd < 15 else 26
-                mask = (df['Ad Soyad'] == py) & (df['Tür'].str.contains("Yıllık"))
-                ku = df[mask]['G'].sum()
-                st
+                personel_listesi = sorted(df['Ad Soyad'].unique())
+                secilen_p = st.selectbox("Personel Seçiniz", personel_listesi)
+                giris_tarihi = st.date_input("İşe Giriş Tarihi", value=datetime(2023, 1, 1))
+                
+                # Kıdem Hesapla
+                bugun = datetime.now()
+                kidem = (bugun.year - giris_tarihi.year) - ((bugun.month, bugun.day) < (giris_tarihi.month, giris_tarihi.day))
+                
+                # Yasal Hak Belirle
+                if kidem < 1: hak = 0
+                elif 1 <= kidem < 5: hak = 14
+                elif 5 <= kidem < 15: hak = 20
+                else: hak = 26
+                
+                # Kullanılanı Hesapla (Veritabanından)
+                kullanilan = df[(df['Ad Soyad'] == secilen_p) & (df['Tür'].str.contains("Yıllık"))]['G'].sum()
+                kalan = hak - kullanilan
+                
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Çalışma Yılı", f"{kidem} Yıl")
+                c2.metric("Toplam Hak", f"{hak} Gün")
+                c3.metric("Kullanılan", f"{kullanilan:.1f} Gün")
+                c4.metric("Kalan İzin", f"{kalan:.1f} Gün", delta_color="normal")
+                
+                st.info(f"💡 Not: 1-5 yıl arası 14 gün, 5-15 yıl arası 20 gün, 15+ yıl 26 gün izin hak edilir.")
