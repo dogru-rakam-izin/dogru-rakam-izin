@@ -4,7 +4,7 @@ import requests
 import json
 from datetime import datetime
 
-# --- AYARLAR ---
+# --- YAPILANDIRMA ---
 URL = "https://script.google.com/macros/s/AKfycbyz1FkOaVRpkSAQoJrhaZcXsu_qQuYN-Y18S-yQblLIUqGBlFgoryoNW4eLfw8d0DZ1/exec"
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
@@ -33,12 +33,12 @@ def yukle():
     except: return pd.DataFrame()
 
 def yazdir_html(bas, ic):
-    ht = f"<html><head><style>body{{font-family:'Times New Roman';padding:40px;line-height:1.6;}} .h{{text-align:center;font-weight:bold;margin-bottom:20px;border-bottom:2px solid #000;}} .c{{white-space:pre-wrap;}}</style></head><body onload='window.print()'><div class='h'>{bas}</div><div class='c'>{ic}</div></body></html>"
+    ht = f"<html><head><style>body{{font-family:'Times New Roman';padding:40px;line-height:1.6;}} .h{{text-align:center;font-weight:bold;margin-bottom:20px;border-bottom:2px solid #000;}} .c{{white-space:pre-wrap;text-align:justify;}}</style></head><body onload='window.print()'><div class='h'>{bas}</div><div class='c'>{ic}</div></body></html>"
     st.components.v1.html(ht, height=0)
 
-m = st.sidebar.radio("MENÜ", ["⬇️ PERSONEL", "🔐 YÖNETİCİ"])
+menu = st.sidebar.radio("MENÜ", ["⬇️ PERSONEL", "🔐 YÖNETİCİ"])
 
-if m == "⬇️ PERSONEL":
+if menu == "⬇️ PERSONEL":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
     ad = st.text_input("Ad Soyad")
     tc = st.text_input("TC No", max_chars=11)
@@ -58,36 +58,29 @@ if m == "⬇️ PERSONEL":
 else:
     st.title("🔐 YÖNETİCİ PANELİ")
     sifre = st.sidebar.text_input("Şifre", type="password")
+    
     if sifre == "1234":
         df = yukle()
-        tabs = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "📄 Formlar", "📅 Yıllık İzin Takip"])
+        # SEKMELERİ TANIMLA
+        tab_karne, tab_sicil, tab_manuel, tab_formlar, tab_yillik = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel Kayıt", "📄 Formlar", "📅 Yıllık İzin Takip"])
         
-        with tabs[0]: # KARNE
+        with tab_karne:
             if not df.empty:
-                ay_secenek = df['Ay'].dropna().unique()
-                if len(ay_secenek) > 0:
-                    ay = st.selectbox("Ay", sorted(ay_secenek, reverse=True))
-                    kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
+                ay_list = df['Ay'].dropna().unique()
+                if len(ay_list) > 0:
+                    sel_ay = st.selectbox("Ay", sorted(ay_list, reverse=True))
+                    kn = df[df['Ay']==sel_ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
                     st.table(kn.style.format({"G": "{:.1f}", "S": "{:.1f}"}))
-                else: st.warning("İşlenecek ay verisi bulunamadı.")
-            else: st.warning("Google Sheets verisi alınamadı veya dosya boş.")
+            else: st.warning("Veri bulunamadı.")
 
-        with tabs[1]: # SİCİL
+        with tab_sicil:
             if not df.empty:
-                p_list = sorted(df['Ad Soyad'].unique())
-                p = st.selectbox("Personel Seç", p_list)
-                st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']])
+                p_sec = st.selectbox("Personel Seç", sorted(df['Ad Soyad'].unique()))
+                st.dataframe(df[df['Ad Soyad']==p_sec][['Başlangıç','Dönüş','Tür','G','S']])
 
-        with tabs[2]: # MANUEL
-            ma = st.text_input("Personel İsmi")
-            with st.form("m_form"):
-                tr, ta, dn = st.selectbox("İzin Türü", IZ), st.date_input("Başla Tarihi"), st.date_input("Dönüş Tarihi")
-                if st.form_submit_button("KAYDET") and ma:
-                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":"0","ad":ma,"brans":"Y","tur":tr,"bas":ta.strftime('%d/%m/%Y'),"bit":dn.strftime('%d/%m/%Y')}))
-                    st.success("Eklendi!"); st.rerun()
-
-        with tabs[3]: # FORMLAR
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                if st.button("📄 PERSONEL İZİN"):
-                    yazdir_html
+        with tab_manuel:
+            m_ad = st.text_input("Personel İsmi")
+            with st.form("manuel"):
+                m_tur, m_bas, m_don = st.selectbox("Tür", IZ), st.date_input("Başlangıç"), st.date_input("İş Başı")
+                if st.form_submit_button("KAYDET") and m_ad:
+                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":"0","ad":m_ad,"brans":"Y","tur":m_tur,"bas":m_bas.strftime('%d/%m/%Y
