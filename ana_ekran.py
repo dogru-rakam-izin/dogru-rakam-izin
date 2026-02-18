@@ -61,7 +61,6 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    # PERSONEL FORMU
     with st.form("p_form"):
         f1, f2 = st.columns(2)
         with f1:
@@ -78,7 +77,6 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
                 bas_str = tar.strftime('%d/%m/%Y')
                 bit_str = donus.strftime('%d/%m/%Y')
         
-        # SUBMIT BUTTON FORMUN İÇİNDE OLMALI (GİRİNTİYE DİKKAT)
         gonder = st.form_submit_button("TALEBİ GÖNDER")
         if gonder:
             if ad and tc:
@@ -95,15 +93,4 @@ else:
     
     if sifre == "1234":
         df = verileri_yukle()
-        tab1, tab2 = st.tabs(["📊 Aylık Personel Karnesi", "📝 Manuel İzin Girişi"])
-        
-        with tab1:
-            if not df.empty:
-                aylar = sorted(df['Ay_Ismi'].dropna().unique(), reverse=True)
-                sec_ay = st.selectbox("Ay Seçin", aylar)
-                ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
-                
-                karne = ay_df.groupby('Ad Soyad').agg({'Sure_Deger': 'sum', 'Tür': 'count'})
-                karne.columns = ['Toplam İzin', 'Kayıt Sayısı']
-                # Sayıları temizle (2.0 -> 2)
-                karne['Toplam İzin'] = karne['
+        tab1, tab2
