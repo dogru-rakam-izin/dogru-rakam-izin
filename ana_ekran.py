@@ -4,11 +4,6 @@ import requests
 import json
 from datetime import datetime
 
-# --- FORM METINLERI ---
-F1 = "1. KIMLIK: ___\n2. TUR: [ ] Yillik [ ] Mazeret\n3. IMZA: ___"
-F2 = "Mudurluge,\nUcretsiz izin istiyorum.\nImza: ___"
-F3 = "Mudurluge,\nYillik izin istiyorum.\nImza: ___"
-
 # --- AYARLAR ---
 URL = "https://script.google.com/macros/s/AKfycbyz1FkOaVRpkSAQoJrhaZcXsu_qQuYN-Y18S-yQblLIUqGBlFgoryoNW4eLfw8d0DZ1/exec"
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
@@ -40,58 +35,57 @@ def yukle():
         return df
     except: return pd.DataFrame()
 
-def yazdir(bas, ic):
-    ht = f"<html><body onload='window.print()'><h3>{bas}</h3><pre>{ic}</pre></body></html>"
-    st.components.v1.html(ht, height=0)
-
 m = st.sidebar.radio("MENU", ["PERSONEL", "YONETICI"])
 
 if m == "PERSONEL":
-    st.title("DOĞRU RAKAM İZİN")
+    st.title("DOĞRU RAKAM İZİN SİSTEMİ")
     ad = st.text_input("Ad Soyad")
     tc = st.text_input("TC No")
-    with st.form("p"):
-        t1 = st.selectbox("Tür", IZ)
-        t2 = st.date_input("Tarih")
-        if st.form_submit_button("GONDER") and ad:
+    with st.form("p_form"):
+        t1 = st.selectbox("İzin Türü", IZ)
+        t2 = st.date_input("Başlangıç Tarihi")
+        if st.form_submit_button("GÖNDER") and ad:
             dt = datetime.now().strftime("%d/%m/%Y")
             b_s = t2.strftime('%d/%m/%Y')
             d = {"tarih":dt,"tc":tc,"ad":ad,"brans":"P","tur":t1,"bas":b_s,"bit":b_s}
             requests.post(URL, data=json.dumps(d))
-            st.success("Gonderildi")
+            st.success("Talebiniz Gönderildi")
+
 else:
-    st.title("YONETICI PANELI")
-    sifre = st.sidebar.text_input("Sifre", type="password")
+    st.title("🔐 YÖNETİCİ PANELİ")
+    sifre = st.sidebar.text_input("Şifre", type="password")
     if sifre == "1234":
         df = yukle()
-        t = st.tabs(["Karne", "Sicil", "Manuel", "Formlar", "Yillik"])
+        t = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel Kayıt", "📅 Yıllık İzin Takip"])
+        
         with t[0]:
             if not df.empty:
                 ays = sorted(df['Ay'].dropna().unique(), reverse=True)
-                ay = st.selectbox("Ay Sec", ays)
+                ay = st.selectbox("Ay Seç", ays)
                 st.table(df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum())
+        
         with t[1]:
             if not df.empty:
                 ps = sorted(df['Ad Soyad'].unique())
-                p = st.selectbox("Kisi", ps)
+                p = st.selectbox("Personel Seç", ps)
                 st.dataframe(df[df['Ad Soyad']==p])
+
         with t[2]:
-            ma = st.text_input("Isim")
-            if st.button("KAYDET") and ma: st.success("Ok")
-        with t[3]:
-            c1, c2, c3 = st.columns(3)
-            if c1.button("IZIN FORMU"): yazdir("IZIN FORMU", F1)
-            if c2.button("UCRETSIZ"): yazdir("UCRETSIZ", F2)
-            if c3.button("YILLIK"): yazdir("YILLIK", F3)
-        with t[4]:
+            ma = st.text_input("Personel İsmi")
+            with st.form("m_f"):
+                m_t = st.selectbox("Tür ", IZ)
+                m_b = st.date_input("Başlangıç ")
+                if st.form_submit_button("SİSTEME KAYDET") and ma:
+                    st.success("Kaydedildi")
+
+        with t[4 if len(t)>4 else 3]:
+            st.subheader("Yıllık İzin Hak ediş Hesaplama")
             if not df.empty:
                 plist = sorted(df['Ad Soyad'].unique())
-                py = st.selectbox("Personel", plist)
-                gr = st.date_input("Giris")
+                py = st.selectbox("Personel Seç", plist, key="y_p")
+                gr = st.date_input("İşe Giriş Tarihi")
                 kd = (datetime.now().year - gr.year)
                 hk = 14 if kd < 5 else 20 if kd < 15 else 26
                 mask = (df['Ad Soyad'] == py) & (df['Tür'].str.contains("Yıllık"))
                 ku = df[mask]['G'].sum()
-                st.metric("Kalan", f"{hk-ku} Gun")
-    else:
-        st.write("Lütfen geçerli şifreyi girin.")
+                st
