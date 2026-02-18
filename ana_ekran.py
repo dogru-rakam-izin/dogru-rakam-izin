@@ -4,7 +4,7 @@ import requests
 import json
 from datetime import datetime
 
-# --- YAPILANDIRMA ---
+# --- AYARLAR ---
 URL = "https://script.google.com/macros/s/AKfycbyz1FkOaVRpkSAQoJrhaZcXsu_qQuYN-Y18S-yQblLIUqGBlFgoryoNW4eLfw8d0DZ1/exec"
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
@@ -61,26 +61,28 @@ else:
     
     if sifre == "1234":
         df = yukle()
-        # SEKMELERİ TANIMLA
-        tab_karne, tab_sicil, tab_manuel, tab_formlar, tab_yillik = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel Kayıt", "📄 Formlar", "📅 Yıllık İzin Takip"])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel Kayıt", "📄 Formlar", "📅 Yıllık İzin Takip"])
         
-        with tab_karne:
+        with tab1:
             if not df.empty:
                 ay_list = df['Ay'].dropna().unique()
                 if len(ay_list) > 0:
-                    sel_ay = st.selectbox("Ay", sorted(ay_list, reverse=True))
+                    sel_ay = st.selectbox("Ay Seç", sorted(ay_list, reverse=True))
                     kn = df[df['Ay']==sel_ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
                     st.table(kn.style.format({"G": "{:.1f}", "S": "{:.1f}"}))
             else: st.warning("Veri bulunamadı.")
 
-        with tab_sicil:
+        with tab2:
             if not df.empty:
-                p_sec = st.selectbox("Personel Seç", sorted(df['Ad Soyad'].unique()))
+                p_sec = st.selectbox("Personel Seçiniz", sorted(df['Ad Soyad'].unique()))
                 st.dataframe(df[df['Ad Soyad']==p_sec][['Başlangıç','Dönüş','Tür','G','S']])
 
-        with tab_manuel:
-            m_ad = st.text_input("Personel İsmi")
-            with st.form("manuel"):
-                m_tur, m_bas, m_don = st.selectbox("Tür", IZ), st.date_input("Başlangıç"), st.date_input("İş Başı")
+        with tab3:
+            m_ad = st.text_input("Manuel İsim")
+            with st.form("manuel_form"):
+                m_t = st.selectbox("İzin Türü", IZ)
+                m_b = st.date_input("Başlangıç")
+                m_d = st.date_input("İşe Dönüş")
                 if st.form_submit_button("KAYDET") and m_ad:
-                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":"0","ad":m_ad,"brans":"Y","tur":m_tur,"bas":m_bas.strftime('%d/%m/%Y
+                    payload = {
+                        "tarih": datetime.now().strftime("%d/%m
