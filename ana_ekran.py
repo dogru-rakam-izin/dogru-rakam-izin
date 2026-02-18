@@ -61,7 +61,7 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("p_form_v3"):
+    with st.form("p_form_fix"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
@@ -71,4 +71,52 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
                 s1 = st.time_input("Çıkış Saati")
                 s2 = st.time_input("Dönüş Saati")
                 bas_str = f"{tar.strftime('%d/%m/%Y')} {s1.strftime('%H:%M')}"
-                bit_str = f"{tar.strftime('%d/%m/%Y')} {
+                bit_str = f"{tar.strftime('%d/%m/%Y')} {s2.strftime('%H:%M')}"
+            else:
+                donus = st.date_input("İş Başı Tarihi")
+                bas_str = tar.strftime('%d/%m/%Y')
+                bit_str = donus.strftime('%d/%m/%Y')
+        
+        if st.form_submit_button("TALEBİ GÖNDER"):
+            if ad and tc:
+                p_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str}
+                requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
+                st.success("Talebiniz iletildi!")
+                st.balloons()
+
+else:
+    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
+    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
+    
+    if sifre == "1234":
+        df = verileri_yukle()
+        tab1, tab2 = st.tabs(["📊 Aylık Personel Karnesi", "📝 Manuel İzin Girişi"])
+        
+        with tab1:
+            if not df.empty:
+                aylar = sorted(df['Ay_Ismi'].dropna().unique(), reverse=True)
+                if aylar:
+                    sec_ay = st.selectbox("Ay Seçin", aylar)
+                    ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
+                    
+                    karne = ay_df.groupby('Ad Soyad').agg({'Gun_Deger': 'sum', 'Saat_Deger': 'sum', 'Tür': 'count'})
+                    karne.columns = ['Toplam Gün', 'Toplam Saat', 'Kayıt Sayısı']
+                    
+                    # 2.0 -> 2 formatlaması
+                    karne['Toplam Gün'] = karne['Toplam Gün'].apply(lambda x: int(x) if x == int(x) else round(x, 1))
+                    karne['Toplam Saat'] = karne['Toplam Saat'].apply(lambda x: int(x) if x == int(x) else round(x, 1))
+                    
+                    st.table(karne)
+                    st.write("---")
+                    st.dataframe(ay_df[['Ad Soyad', 'Tür', 'Başlangıç', 'Dönüş', 'Gun_Deger', 'Saat_Deger']])
+                else:
+                    st.info("Henüz bu ay için kayıt yok.")
+            else:
+                st.info("Henüz kayıt bulunmuyor.")
+
+        with tab2:
+            st.subheader("📝 Manuel İzin Girişi")
+            m_ad = st.text_input("Personel Adı Soyadı")
+            m_tip = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], key="m_key_fix")
+            
+            with st.
