@@ -45,18 +45,20 @@ if menu == "⬇️ PERSONEL":
     tp = st.radio("Süre", ["Tam Gün", "Saatlik"], horizontal=True)
     with st.form("p"):
         t1, t2 = st.selectbox("Tür", IZ), st.date_input("Tarih")
+        t_fmt = t2.strftime('%d/%m/%Y')
         if tp == "Saatlik":
-            s1, s2 = st.time_input("Çıkış Saati"), st.time_input("Dönüş Saati")
-            b = f"{t2.strftime('%d/%m/%Y')} {s1.strftime('%H:%M')}"
-            d = f"{t2.strftime('%d/%m/%Y')} {s2.strftime('%H:%M')}"
+            s1, s2 = st.time_input("Çıkış"), st.time_input("Dönüş")
+            b = f"{t_fmt} {s1.strftime('%H:%M')}"
+            d = f"{t_fmt} {s2.strftime('%H:%M')}"
         else:
             dn = st.date_input("İş Başı")
-            b, d = t2.strftime('%d/%m/%Y'), dn.strftime('%d/%m/%Y')
+            b = t_fmt
+            d = dn.strftime('%d/%m/%Y')
         if st.form_submit_button("GÖNDER") and ad:
             dt_now = datetime.now().strftime("%d/%m/%Y")
-            payload = {"tarih":dt_now,"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}
-            requests.post(URL, data=json.dumps(payload))
-            st.success("Başarıyla İletildi!")
+            pay = {"tarih":dt_now,"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}
+            requests.post(URL, data=json.dumps(pay))
+            st.success("İletildi!")
 
 else:
     st.title("🔐 YÖNETİCİ PANELİ")
@@ -65,28 +67,4 @@ else:
         if df.empty:
             st.warning("Veri bulunamadı.")
         else:
-            tabs = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "📅 Yıllık İzin"])
-            with tabs[0]:
-                aylar = sorted(df['Ay'].dropna().unique(), reverse=True)
-                if aylar:
-                    ay = st.selectbox("Ay Seç", aylar)
-                    kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
-                    st.table(kn)
-            with tabs[1]:
-                p_list = sorted(df['Ad Soyad'].unique())
-                p_sec = st.selectbox("Personel Seç", p_list)
-                st.dataframe(df[df['Ad Soyad']==p_sec][['Başlangıç','Dönüş','Tür','G','S']])
-            with tabs[2]:
-                m_ad = st.text_input("İsim")
-                m_tp = st.radio("Tip", ["Tam Gün", "Saatlik"], horizontal=True)
-                with st.form("m"):
-                    m_tr, m_ta = st.selectbox("Tür ", IZ), st.date_input("Tarih ")
-                    if m_tp == "Saatlik":
-                        ms1, ms2 = st.time_input("Saat 1"), st.time_input("Saat 2")
-                        # Hatalı olan satır burasıydı, şimdi güvenli:
-                        t_str = m_ta.strftime('%d/%m/%Y')
-                        mb = f"{t_str} {ms1.strftime('%H:%M')}"
-                        md = f"{t_str} {ms2.strftime('%H:%M')}"
-                    else:
-                        m_dn = st.date_input("İş Başı Tarihi")
-                        mb, md = m_ta.strftime('%d/%m/%Y'), m_dn.strftime('%
+            tabs = st.tabs(["📊 Karne", "👤
