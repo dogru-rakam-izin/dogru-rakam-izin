@@ -18,17 +18,11 @@ TR_AYLAR = {
     "September": "Eylül", "October": "Ekim", "November": "Kasım", "December": "Aralık"
 }
 
-# --- YENİ İZİN TÜRLERİ LİSTESİ ---
+# --- İZİN TÜRLERİ LİSTESİ ---
 IZIN_LISTESI = [
-    "Yıllık İzin", 
-    "Mazeret İzni", 
-    "Sağlık Raporu", 
-    "Saatlik İzin", 
-    "Ücretsiz İzin",
-    "Evlilik İzni",
-    "Vefat İzni",
-    "Babalık İzni",
-    "Eğitim / Seminer"
+    "Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", 
+    "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", 
+    "Vefat İzni", "Babalık İzni", "Eğitim / Seminer"
 ]
 
 def verileri_yukle():
@@ -45,6 +39,7 @@ def verileri_yukle():
                     bas = datetime.strptime(str(row['Başlangıç']), fmt)
                     bit = datetime.strptime(str(row['Dönüş']), fmt)
                     fark = bit - bas
+                    # Saatlik izinlerde 1.5 saat gibi ondalıkları koru
                     return float(round(fark.seconds / 3600, 1))
                 else:
                     fmt = "%d/%m/%Y"
@@ -72,7 +67,7 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("personel_formu_v5"):
+    with st.form("personel_izin_formu"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
@@ -90,4 +85,10 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
                 bit_str = donus.strftime('%d/%m/%Y')
         
         onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
-        if st.form_submit_button("
+        if st.form_submit_button("TALEBİ GÖNDER"):
+            if ad and tc and onay:
+                p_data = {
+                    "tarih": datetime.now().strftime("%d/%m/%Y"), 
+                    "tc": str(tc), 
+                    "ad": ad, 
+                    "brans": "Person
