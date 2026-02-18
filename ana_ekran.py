@@ -18,7 +18,7 @@ TR_AYLAR = {
     "September": "Eylül", "October": "Ekim", "November": "Kasım", "December": "Aralık"
 }
 
-# --- İZİN TÜRLERİ ---
+# --- İZİN TÜRLERİ LİSTESİ ---
 IZIN_LISTESI = [
     "Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", 
     "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", 
@@ -61,7 +61,7 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("p_form"):
+    with st.form("p_form_v2"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
@@ -75,4 +75,39 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
             else:
                 donus = st.date_input("İş Başı Tarihi")
                 bas_str = tar.strftime('%d/%m/%Y')
-                bit_str = donus.strftime('%d/%
+                bit_str = donus.strftime('%d/%m/%Y')
+        
+        gonder = st.form_submit_button("TALEBİ GÖNDER")
+        if gonder:
+            if ad and tc:
+                p_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str}
+                requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
+                st.success("Talebiniz iletildi!")
+                st.balloons()
+            else:
+                st.error("Lütfen Ad Soyad ve TC giriniz.")
+
+else:
+    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
+    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
+    
+    if sifre == "1234":
+        df = verileri_yukle()
+        tab1, tab2 = st.tabs(["📊 Aylık Personel Karnesi", "📝 Manuel İzin Girişi"])
+        
+        with tab1:
+            if not df.empty:
+                aylar = sorted(df['Ay_Ismi'].dropna().unique(), reverse=True)
+                if aylar:
+                    sec_ay = st.selectbox("Ay Seçin", aylar)
+                    ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
+                    
+                    karne = ay_df.groupby('Ad Soyad').agg({'Sure_Deger': 'sum', 'Tür': 'count'})
+                    karne.columns = ['Toplam İzin', 'Kayıt Sayısı']
+                    karne['Toplam İzin'] = karne['Toplam İzin'].apply(lambda x: int(x) if x == int(x) else round(x, 1))
+                    
+                    st.table(karne)
+                    st.write("---")
+                    st.dataframe(ay_df[['Ad Soyad', 'Tür', 'Başlangıç', 'Dönüş', 'Sure_Deger']])
+                else:
+                    st.info("Kayıtlı ay verisi bulunamadı.")
