@@ -18,27 +18,25 @@ TR_AYLAR = {
     "September": "Eylül", "October": "Ekim", "November": "Kasım", "December": "Aralık"
 }
 
-# --- İZİN TÜRLERİ ---
+# --- YENİ İZİN TÜRLERİ LİSTESİ ---
 IZIN_LISTESI = [
-    "Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", 
-    "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", 
-    "Vefat İzni", "Babalık İzni"
+    "Yıllık İzin", 
+    "Mazeret İzni", 
+    "Sağlık Raporu", 
+    "Saatlik İzin", 
+    "Ücretsiz İzin",
+    "Evlilik İzni",
+    "Vefat İzni",
+    "Babalık İzni",
+    "Eğitim / Seminer"
 ]
 
 def verileri_yukle():
     try:
-        # Veriyi çek ve boşlukları temizle
         df = pd.read_csv(SHEET_READ_URL)
         if df.empty:
             return pd.DataFrame()
-            
         df.columns = [c.strip() for c in df.columns]
-        
-        # Tarih Dönüşümü (Hata payını azaltmak için formatı zorluyoruz)
-        df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
-        
-        # Eğer tarih okunamadıysa satırı atla
-        df = df.dropna(subset=['Tarih_Obj'])
         
         def sure_hesapla(row):
             try:
@@ -58,30 +56,27 @@ def verileri_yukle():
                 return 0
 
         df['Sure_Deger'] = df.apply(sure_hesapla, axis=1)
+        df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay_Ing'] = df['Tarih_Obj'].dt.strftime('%B')
         df['Yil'] = df['Tarih_Obj'].dt.strftime('%Y')
         df['Ay_Ismi'] = df['Ay_Ing'].map(TR_AYLAR) + " " + df['Yil']
         return df
-    except Exception as e:
-        st.error(f"Veri yükleme hatası: {e}")
+    except:
         return pd.DataFrame()
 
-# --- MENÜ ---
 menu = st.sidebar.radio("MENÜ SEÇİMİ", ["⬇️ PERSONEL İZİN TALEBİ", "🔐 YÖNETİCİ PANELİ"])
 
 if menu == "⬇️ PERSONEL İZİN TALEBİ":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
-    
     ad = st.text_input("Ad Soyad")
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("personel_formu_v4"):
+    with st.form("personel_formu_v5"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
             tar = st.date_input("İzin Tarihi")
-            
         with f2:
             if tip == "Saatlik":
                 s1, s2 = st.columns(2)
@@ -95,74 +90,4 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
                 bit_str = donus.strftime('%d/%m/%Y')
         
         onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
-        submit = st.form_submit_button("TALEBİ GÖNDER")
-        
-        if submit:
-            if ad and tc and onay:
-                p_data = {
-                    "tarih": datetime.now().strftime("%d/%m/%Y"),
-                    "tc": str(tc), "ad": ad, "brans": "Personel",
-                    "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str
-                }
-                requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
-                st.success(f"Talebiniz ({tur}) başarıyla iletildi.")
-                st.balloons()
-            else:
-                st.warning("Lütfen tüm alanları doldurun.")
-
-else:
-    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
-    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
-    
-    if sifre == "1234":
-        df = verileri_yukle()
-        
-        if df is not None and not df.empty:
-            tab1, tab2 = st.tabs(["📊 Aylık Personel Karnesi", "📝 Manuel İzin Girişi"])
-            
-            with tab1:
-                aylar = sorted(df['Ay_Ismi'].unique(), reverse=True)
-                sec_ay = st.selectbox("İncelemek İstediğiniz Ayı Seçin", aylar)
-                
-                ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
-                
-                # Hesaplamalar
-                ay_df['Günlük'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" not in str(x['Tür']) else 0, axis=1)
-                ay_df['Saatlik'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" in str(x['Tür']) else 0, axis=1)
-                
-                karne = ay_df.groupby('Ad Soyad').agg({'Günlük': 'sum', 'Saatlik': 'sum', 'Tür': 'count'})
-                karne.columns = ['Toplam Gün', 'Toplam Saat', 'Kayıt Adedi']
-                
-                st.subheader(f"🗓️ {sec_ay} Personel Karnesi")
-                st.table(karne)
-                
-                st.write("---")
-                st.write("🔍 **Detaylı Hareket Listesi:**")
-                st.dataframe(ay_df[['Ad Soyad', 'Tür', 'Başlangıç', 'Dönüş', 'Sure_Deger']])
-            
-            with tab2:
-                y_ad = st.text_input("Personel Ad Soyad")
-                y_tip = st.radio("İzin Tipi (Admin)", ["Tam Gün", "Saatlik"], horizontal=True)
-                
-                with st.form("admin_manuel_form_v4"):
-                    y_tur = st.selectbox("İzin Türü", IZIN_LISTESI)
-                    y_tar = st.date_input("Tarih")
-                    
-                    if y_tip == "Saatlik":
-                        c1, c2 = st.columns(2)
-                        y_s1 = c1.time_input("Başla")
-                        y_s2 = c2.time_input("Bitir")
-                        y_bas, y_bit = f"{y_tar.strftime('%d/%m/%Y')} {y_s1.strftime('%H:%M')}", f"{y_tar.strftime('%d/%m/%Y')} {y_s2.strftime('%H:%M')}"
-                    else:
-                        y_don = st.date_input("İş Başı")
-                        y_bas, y_bit = y_tar.strftime('%d/%m/%Y'), y_don.strftime('%d/%m/%Y')
-                    
-                    if st.form_submit_button("Sisteme Kaydet"):
-                        p_y = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": "---", "ad": y_ad, "brans": "Yönetici", "tur": f"{y_tur} ({y_tip})", "bas": y_bas, "bit": y_bit}
-                        requests.post(APPS_SCRIPT_URL, data=json.dumps(p_y))
-                        st.success("Kayıt başarıyla eklendi!")
-                        st.rerun()
-        else:
-            st.warning("Henüz hiç kayıt bulunamadı veya Google Sheets bağlantısı bekleniyor. Lütfen 'Personel İzin Talebi' kısmından bir deneme kaydı oluşturun.")
-    elif sifre != "":
-        st.error("Hatalı Giriş Şifresi!")
+        if st.form_submit_button("
