@@ -75,22 +75,4 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
             else:
                 donus = st.date_input("İş Başı Tarihi")
                 bas_str = tar.strftime('%d/%m/%Y')
-                bit_str = donus.strftime('%d/%m/%Y')
-        
-        gonder = st.form_submit_button("TALEBİ GÖNDER")
-        if gonder:
-            if ad and tc:
-                p_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str}
-                requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
-                st.success("Talebiniz iletildi!")
-                st.balloons()
-            else:
-                st.error("Lütfen Ad Soyad ve TC giriniz.")
-
-else:
-    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
-    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
-    
-    if sifre == "1234":
-        df = verileri_yukle()
-        tab1, tab2
+                bit_str = donus.strftime('%d/%
