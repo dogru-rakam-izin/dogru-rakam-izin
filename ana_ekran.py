@@ -32,6 +32,21 @@ def yukle():
         return df
     except: return pd.DataFrame()
 
+# Yazdırma fonksiyonu (HTML/JS kullanarak)
+def yazdir_html(baslik, icerik):
+    html = f"""
+    <html>
+    <head><title>{baslik}</title></head>
+    <body onload="window.print()">
+        <div style="font-family: Arial; padding: 40px; line-height: 1.6;">
+            <h2 style="text-align: center;">{baslik}</h2>
+            <pre style="white-space: pre-wrap; font-family: Arial; font-size: 14px;">{icerik}</pre>
+        </div>
+    </body>
+    </html>
+    """
+    st.components.v1.html(html, height=0)
+
 m = st.sidebar.radio("MENÜ", ["⬇️ PERSONEL", "🔐 YÖNETİCİ"])
 
 if m == "⬇️ PERSONEL":
@@ -54,7 +69,7 @@ else:
     st.title("🔐 YÖNETİCİ PANELİ")
     if st.sidebar.text_input("Giriş Şifresi", type="password") == "1234":
         df = yukle()
-        tabs = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel Kayıt", "📄 Formlar & Dilekçeler"])
+        tabs = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel Kayıt", "📄 Formlar"])
         
         with tabs[0]: # KARNE
             if not df.empty:
@@ -86,23 +101,20 @@ else:
                     st.success("Kayıt eklendi!"); st.rerun()
 
         with tabs[3]: # FORMLAR
-            st.subheader("Kurumsal İzin Formları Şablonları")
-            st.info("İlgili belgenin üzerine sağ tıklayıp yazdırabilir veya kopyalayabilirsiniz.")
-            
+            st.subheader("Kurumsal İzin Formu Yazdır")
             c1, c2, c3 = st.columns(3)
+            
             with c1:
-                if st.button("📄 Genel İzin Formu"):
-                    st.markdown("""**PERSONEL İZİN FORMU** [cite: 2]
-                    * Adı Soyadı: .................... [cite: 5]
-                    * İzin Türü: Yıllık/Mazeret/Sağlık/Ücretsiz [cite: 9]
-                    * Tarih: ..../..../2026 [cite: 10]""")
+                if st.button("📄 PERSONEL İZİN FORMU"):
+                    metin = """DOĞRU RAKAM ÖZEL EĞİTİM VE REHABİLİTASYON MERKEZİ\nPERSONEL İZİN FORMU\n\nAdı Soyadı: .......................................\nTC No: ...........................................\nİzin Türü: [ ] Yıllık [ ] Mazeret [ ] Sağlık\nAyrılış: ..../..../2026\nDönüş: ..../..../2026\n\nİMZA: ......................."""
+                    yazdir_html("PERSONEL İZİN FORMU", metin)
+            
             with c2:
-                if st.button("📄 Ücretsiz İzin Dilekçesi"):
-                    st.markdown("""**ÜCRETSİZ İZİN FORMU** [cite: 29]
-                    * Şahsi nedenlerimle ücretsiz izin kullanmak istiyorum. [cite: 30]
-                    * Ücret ödenmeyeceğini kabul ederim. [cite: 31]""")
+                if st.button("📄 ÜCRETSİZ İZİN"):
+                    metin = """DOĞRU RAKAM ÖZEL EĞİTİM MÜDÜRLÜĞÜ'NE\n\nŞahsi nedenlerimle ..../..../2026 tarihleri arasında ücretsiz izin kullanmak istiyorum. Bu süre zarfında ücret talep etmeyeceğimi beyan ederim.\n\nAd Soyad: .......................\nİmza: .........................."""
+                    yazdir_html("ÜCRETSİZ İZİN DİLEKÇESİ", metin)
+
             with c3:
-                if st.button("📄 Yıllık İzin Dilekçesi"):
-                    st.markdown("""**YILLIK İZİN DİLEKÇESİ** [cite: 36]
-                    * 4857 Sayılı Kanun uyarınca yıllık izin talebi. [cite: 38]
-                    * İzin Başlangıç: ..../..../2026 [cite: 40]""")
+                if st.button("📄 YILLIK İZİN"):
+                    metin = """DOĞRU RAKAM ÖZEL EĞİTİM MÜDÜRLÜĞÜ'NE\n\n4857 Sayılı Kanun uyarınca yıllık ücretli izin hakkımı kullanmak istiyorum.\nİzin Başlangıç: ..../..../2026\nİşe Başlama: ..../..../2026\n\nAd Soyad: .......................\nİmza: .........................."""
+                    yazdir_html("YILLIK İZİN DİLEKÇESİ", metin)
