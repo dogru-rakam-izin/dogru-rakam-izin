@@ -55,9 +55,10 @@ def verileri_yukle():
     except:
         return pd.DataFrame()
 
+# --- ARAYÜZ ---
 menu = st.sidebar.radio("MENÜ SEÇİMİ", ["⬇️ PERSONEL İZİN TALEBİ", "🔐 YÖNETİCİ PANELİ"])
 
-if menu == "⬇️ PERSONEL İZİR TALEBİ":
+if menu == "⬇️ PERSONEL İZİN TALEBİ":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
     ad = st.text_input("Ad Soyad")
     tc = st.text_input("TC Kimlik No", max_chars=11)
@@ -86,11 +87,3 @@ if menu == "⬇️ PERSONEL İZİR TALEBİ":
                 p_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str}
                 requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
                 st.success("Talebiniz başarıyla iletildi.")
-                st.balloons()
-            else:
-                st.warning("Lütfen tüm alanları doldurun.")
-
-else:
-    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
-    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
-    if sifre == "1234":
