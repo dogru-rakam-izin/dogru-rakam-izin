@@ -31,29 +31,32 @@ def verileri_yukle():
         if df.empty: return pd.DataFrame()
         df.columns = [c.strip() for c in df.columns]
         
-        def sure_hesapla(row):
+        def sure_ayristir(row):
             try:
+                # Tür sütununda 'Saatlik' ifadesi geçiyorsa saat olarak hesapla
                 if "Saatlik" in str(row['Tür']):
                     fmt = "%d/%m/%Y %H:%M"
                     bas = datetime.strptime(str(row['Başlangıç']), fmt)
                     bit = datetime.strptime(str(row['Dönüş']), fmt)
                     fark = bit - bas
-                    return float(round(fark.seconds / 3600, 1))
+                    return 0, float(round(fark.seconds / 3600, 1)) # (Gün, Saat)
                 else:
+                    # Tam gün izinler
                     fmt = "%d/%m/%Y"
                     bas = datetime.strptime(str(row['Başlangıç']), fmt)
                     bit = datetime.strptime(str(row['Dönüş']), fmt)
                     fark = (bit - bas).days
-                    return int(fark)
-            except: return 0
+                    return int(fark), 0 # (Gün, Saat)
+            except: return 0, 0
 
-        df['Sure_Deger'] = df.apply(sure_hesapla, axis=1)
+        # İzinleri Gün ve Saat olarak iki ayrı sütuna ayırıyoruz
+        df[['Gun_Deger', 'Saat_Deger']] = df.apply(lambda r: pd.Series(sure_ayristir(r)), axis=1)
+        
         df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay_Ismi'] = df['Tarih_Obj'].dt.strftime('%B').map(TR_AYLAR) + " " + df['Tarih_Obj'].dt.strftime('%Y')
         return df
     except: return pd.DataFrame()
 
-# --- ANA MENÜ ---
 menu = st.sidebar.radio("MENÜ SEÇİMİ", ["⬇️ PERSONEL İZİN TALEBİ", "🔐 YÖNETİCİ PANELİ"])
 
 if menu == "⬇️ PERSONEL İZİN TALEBİ":
@@ -62,7 +65,7 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("p_form_final"):
+    with st.form("p_form_new"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
@@ -87,55 +90,4 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
 
 else:
     st.title("🔐 YÖNETİCİ KONTROL PANELİ")
-    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
-    
-    if sifre == "1234":
-        df = verileri_yukle()
-        tab1, tab2 = st.tabs(["📊 Aylık Personel Karnesi", "📝 Manuel İzin Girişi"])
-        
-        with tab1:
-            if not df.empty:
-                aylar = sorted(df['Ay_Ismi'].dropna().unique(), reverse=True)
-                sec_ay = st.selectbox("Ay Seçin", aylar)
-                ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
-                
-                karne = ay_df.groupby('Ad Soyad').agg({'Sure_Deger': 'sum', 'Tür': 'count'})
-                karne.columns = ['Toplam İzin', 'Kayıt Sayısı']
-                # Sayıları temizle (2.0 -> 2)
-                karne['Toplam İzin'] = karne['Toplam İzin'].apply(lambda x: int(x) if x == int(x) else round(x, 1))
-                
-                st.subheader(f"🗓️ {sec_ay} Personel Durumu")
-                st.table(karne)
-                st.write("---")
-                st.dataframe(ay_df[['Ad Soyad', 'Tür', 'Başlangıç', 'Dönüş', 'Sure_Deger']])
-            else:
-                st.info("Henüz veri bulunmuyor.")
-
-        with tab2:
-            st.subheader("📝 Yönetici Manuel İzin Kaydı")
-            m_ad = st.text_input("Personel Adı Soyadı")
-            m_tip = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], key="m_key")
-            
-            with st.form("m_form_final"):
-                m_tur = st.selectbox("İzin Türü", IZIN_LISTESI)
-                m_tar = st.date_input("İzin Tarihi")
-                if m_tip == "Saatlik":
-                    m_s1 = st.time_input("Başlangıç Saati")
-                    m_s2 = st.time_input("Bitiş Saati")
-                    m_bas = f"{m_tar.strftime('%d/%m/%Y')} {m_s1.strftime('%H:%M')}"
-                    m_bit = f"{m_tar.strftime('%d/%m/%Y')} {m_s2.strftime('%H:%M')}"
-                else:
-                    m_don = st.date_input("İş Başı Tarihi")
-                    m_bas = m_tar.strftime('%d/%m/%Y')
-                    m_bit = m_don.strftime('%d/%m/%Y')
-                
-                if st.form_submit_button("Sisteme Manuel Kaydet"):
-                    if m_ad:
-                        m_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": "000", "ad": m_ad, "brans": "Yönetici", "tur": f"{m_tur} ({m_tip})", "bas": m_bas, "bit": m_bit}
-                        requests.post(APPS_SCRIPT_URL, data=json.dumps(m_data))
-                        st.success("Kayıt başarıyla eklendi!")
-                        st.rerun()
-                    else:
-                        st.error("Lütfen personel adını boş bırakmayın.")
-    elif sifre != "":
-        st.error("Hatalı Şifre!")
+    s
