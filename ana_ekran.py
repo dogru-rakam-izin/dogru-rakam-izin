@@ -13,6 +13,7 @@ st.set_page_config(page_title="Doğru Rakam İzin", layout="wide")
 
 TR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
 IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim"]
+TP_LIST = ["Tam Gün", "Saatlik"]
 
 def yukle():
     try:
@@ -41,7 +42,7 @@ m = st.sidebar.radio("MENÜ", ["PERSONEL", "YONETICI"])
 if m == "PERSONEL":
     st.title("DOĞRU RAKAM İZİN")
     ad, tc = st.text_input("Ad Soyad"), st.text_input("TC No")
-    tp = st.radio("Tip", ["Tam Gün", "Saatlik"], horizontal=True)
+    tp = st.radio("Tip", TP_LIST, horizontal=True)
     with st.form("p"):
         t1, t2 = st.selectbox("Tür", IZ), st.date_input("Tarih")
         fmt = t2.strftime('%d/%m/%Y')
@@ -74,4 +75,7 @@ else:
                 st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']])
             with t[2]:
                 m_ad = st.text_input("İsim")
-                m_tp = st.radio("Tip", ["Tam Gün", "Saatlik
+                m_tp = st.radio("Tip", TP_LIST, key="mt")
+                with st.form("m"):
+                    tr, ta = st.selectbox("Tür", IZ), st.date_input("Tarih")
+                    t_f = ta.strftime('%d/%m/%Y
