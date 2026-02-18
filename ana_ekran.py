@@ -30,7 +30,6 @@ def verileri_yukle():
                     bas = datetime.strptime(str(row['Başlangıç']), fmt)
                     bit = datetime.strptime(str(row['Dönüş']), fmt)
                     fark = bit - bas
-                    # Saniyeyi saate çevir ve 1 ondalık bırak
                     return float(round(fark.seconds / 3600, 1))
                 else:
                     fmt = "%d/%m/%Y"
@@ -56,12 +55,12 @@ menu = st.sidebar.radio("MENÜ SEÇİMİ", ["⬇️ PERSONEL İZİN TALEBİ", "�
 if menu == "⬇️ PERSONEL İZİN TALEBİ":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
     
-    # SAAT SORUNUNU ÇÖZEN KRİTİK NOKTA: 'tip' seçimi formun dışında olmalı
+    # SAAT SORUNUNU ÇÖZEN YER: Seçim formun dışında olmalı
     ad = st.text_input("Ad Soyad")
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("personel_formu_vfinal"):
+    with st.form("personel_formu_son"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("Tür", ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin"])
@@ -69,4 +68,9 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
             
         with f2:
             if tip == "Saatlik":
-                s
+                s1, s2 = st.columns(2)
+                saat1 = s1.time_input("Çıkış Saati")
+                saat2 = s2.time_input("Dönüş Saati")
+                bas_str = f"{tar.strftime('%d/%m/%Y')} {saat1.strftime('%H:%M')}"
+                bit_str = f"{tar.strftime('%d/%m/%Y')} {saat2.strftime('%H:%M')}"
+            else
