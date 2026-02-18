@@ -61,12 +61,49 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("personel_formu"):
+    # PERSONEL FORMU
+    with st.form("p_form"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
             tar = st.date_input("İzin Tarihi")
         with f2:
             if tip == "Saatlik":
-                s1, s2 = st.columns(2)
-                saat1 = s1.time_input
+                s1 = st.time_input("Çıkış Saati")
+                s2 = st.time_input("Dönüş Saati")
+                bas_str = f"{tar.strftime('%d/%m/%Y')} {s1.strftime('%H:%M')}"
+                bit_str = f"{tar.strftime('%d/%m/%Y')} {s2.strftime('%H:%M')}"
+            else:
+                donus = st.date_input("İş Başı Tarihi")
+                bas_str = tar.strftime('%d/%m/%Y')
+                bit_str = donus.strftime('%d/%m/%Y')
+        
+        # SUBMIT BUTTON FORMUN İÇİNDE OLMALI (GİRİNTİYE DİKKAT)
+        gonder = st.form_submit_button("TALEBİ GÖNDER")
+        if gonder:
+            if ad and tc:
+                p_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str}
+                requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
+                st.success("Talebiniz iletildi!")
+                st.balloons()
+            else:
+                st.error("Lütfen Ad Soyad ve TC giriniz.")
+
+else:
+    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
+    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
+    
+    if sifre == "1234":
+        df = verileri_yukle()
+        tab1, tab2 = st.tabs(["📊 Aylık Personel Karnesi", "📝 Manuel İzin Girişi"])
+        
+        with tab1:
+            if not df.empty:
+                aylar = sorted(df['Ay_Ismi'].dropna().unique(), reverse=True)
+                sec_ay = st.selectbox("Ay Seçin", aylar)
+                ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
+                
+                karne = ay_df.groupby('Ad Soyad').agg({'Sure_Deger': 'sum', 'Tür': 'count'})
+                karne.columns = ['Toplam İzin', 'Kayıt Sayısı']
+                # Sayıları temizle (2.0 -> 2)
+                karne['Toplam İzin'] = karne['
