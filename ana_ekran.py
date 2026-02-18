@@ -95,15 +95,14 @@ else:
                         requests.post(URL, data=json.dumps(p_m))
                         st.success("Kaydedildi!"); st.rerun()
             with tabs[3]:
-                st.subheader("Yıllık İzin Detaylı Takip")
+                st.subheader("Yıllık İzin Takibi")
                 py = st.selectbox("Personel", sorted(df['Ad Soyad'].unique()), key="py")
                 gt = st.date_input("İşe Giriş", value=datetime(2023, 1, 1))
-                # --- GÜNCEL YIL: 2026 ---
                 kd = (2026 - gt.year)
                 hk = 14 if kd < 5 else 20 if kd < 15 else 26
                 if kd < 1: hk = 0
                 
-                yil_filtre = (df['Ad Soyad'] == py) & (df['Tür'].str.contains("Yıllık İzin", na=False))
+                yil_filtre = (df['Ad Soyad'] == py) & (df['Tür'].str.contains("Yıllık", na=False))
                 df_yil = df[yil_filtre].copy()
                 ku = df_yil['G'].sum()
                 
@@ -112,6 +111,4 @@ else:
                 c2.metric("Kullanılan", f"{ku:.1f} Gün")
                 c3.metric("Kalan", f"{hk-ku:.1f} Gün")
                 
-                if not df_yil.empty:
-                    st.write("Kullanılan İzinlerin Listesi:")
-                    st.dataframe(df_yil[['Başlangıç', 'Dönüş', '
+                if not
