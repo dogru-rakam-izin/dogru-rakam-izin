@@ -30,14 +30,12 @@ def verileri_yukle():
                     bas = datetime.strptime(row['Başlangıç'], fmt)
                     bit = datetime.strptime(row['Dönüş'], fmt)
                     fark = bit - bas
-                    # Saati net sayı olarak döndür (örn: 2.5)
                     return float(round(fark.seconds / 3600, 1))
                 else:
                     fmt = "%d/%m/%Y"
                     bas = datetime.strptime(row['Başlangıç'], fmt)
                     bit = datetime.strptime(row['Dönüş'], fmt)
                     fark = (bit - bas).days
-                    # Günü net sayı olarak döndür (örn: 5)
                     return int(fark)
             except:
                 return 0
@@ -45,7 +43,6 @@ def verileri_yukle():
         df['Sure_Deger'] = df.apply(sure_hesapla, axis=1)
         df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         
-        # Ay ismini al ve Türkçeye çevir
         df['Ay_Ing'] = df['Tarih_Obj'].dt.strftime('%B')
         df['Yil'] = df['Tarih_Obj'].dt.strftime('%Y')
         df['Ay_Ismi'] = df['Ay_Ing'].map(TR_AYLAR) + " " + df['Yil']
@@ -90,9 +87,8 @@ else:
     
     if sifre == "1234":
         df = verileri_yukle()
-        
         if not df.empty:
-            tab1, tab2 = st.tabs(["📊 Aylık Personel Özeti (Çıktı Al)", "📝 Manuel İzin Girişi"])
+            tab1, tab2 = st.tabs(["📊 Aylık Personel Özeti", "📝 Manuel İzin Girişi"])
             
             with tab1:
                 aylar = sorted(df['Ay_Ismi'].dropna().unique())
@@ -105,24 +101,4 @@ else:
                 ozet_tablo = ay_df.groupby('Ad Soyad').agg({
                     'Günlük': 'sum',
                     'Saatlik': 'sum',
-                    'Tür': 'count'
-                }).rename(columns={'Tür': 'İzin Adedi', 'Günlük': 'Toplam Gün', 'Saatlik': 'Toplam Saat'})
-                
-                # Sayı formatını düzeltme (5.000 -> 5)
-                ozet_tablo['Toplam Gün'] = ozet_tablo['Toplam Gün'].astype(int)
-                ozet_tablo['Toplam Saat'] = ozet_tablo['Toplam Saat'].apply(lambda x: int(x) if x == int(x) else x)
-
-                st.write(f"### 🗓️ {secilen_ay} Personel İzin Karnesi")
-                st.table(ozet_tablo)
-                
-                csv = ozet_tablo.to_csv(index=True).encode('utf-16')
-                st.download_button(
-                    label=f"📥 {secilen_ay} Özetini İndir",
-                    data=csv,
-                    file_name=f"{secilen_ay}_ozet.csv",
-                    mime="text/csv",
-                )
-                
-                st.write("---")
-                st.write("🔍 **Detaylı Hareket Listesi:**")
-                st.dataframe(ay_df[['Ad Soyad', 'Tür', 'Başlangıç
+                    'Tür':
