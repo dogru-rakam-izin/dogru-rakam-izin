@@ -50,33 +50,4 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
                 bas = tar.strftime('%d/%m/%Y')
                 bit = donus.strftime('%d/%m/%Y')
         
-        onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
-        submit_btn = st.form_submit_button("TALEBİ GÖNDER") # Buton burada!
-        
-        if submit_btn:
-            if ad and tc and onay:
-                p = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": brans, "tur": f"{tur} ({tip})", "bas": bas, "bit": bit}
-                requests.post(APPS_SCRIPT_URL, data=json.dumps(p))
-                st.success("Başarıyla gönderildi.")
-                st.balloons()
-            else:
-                st.error("Lütfen ad, TC ve onay kutusunu doldurun.")
-
-# --- 2. YÖNETİCİ PANELİ ---
-else:
-    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
-    sifre = st.sidebar.text_input("Şifre", type="password")
-    
-    if sifre == "1234":
-        df = verileri_yukle()
-        kayitli_personeller = sorted(df['Ad Soyad'].unique().tolist()) if not df.empty else []
-
-        st.subheader("📝 YÖNETİCİ İZİN GİRİŞİ (MANUEL)")
-        with st.expander("Buraya Tıklayarak Yeni İzin Ekleyin", expanded=True):
-            with st.form("yönetici_manuel_giris"):
-                y1, y2 = st.columns(2)
-                y_ad_secim = y1.selectbox("Kayıtlı Personel Seç", ["Yeni İsim Yaz..."] + kayitli_personeller)
-                y_ad = y1.text_input("Ad Soyad (Yeni ise)") if y_ad_secim == "Yeni İsim Yaz..." else y_ad_secim
-                
-                y_tip = y2.radio("İzin Tipi", ["Tam Gün", "Saatlik"], horizontal=True)
-                y_tur = y1.selectbox("İzin Türü", ["Yıllık İzin", "Mazeret", "Saatlik",
+        onay = st.checkbox("Bilg
