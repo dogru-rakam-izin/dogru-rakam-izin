@@ -16,32 +16,33 @@ def verileri_yukle():
         df = pd.read_csv(SHEET_READ_URL)
         df.columns = [c.strip() for c in df.columns]
         
-        # Süre Hesaplama Fonksiyonu (Sistemi bozmadan çalışma anında hesaplar)
+        # Çalışma anında süre hesaplama (Sistemi bozmaz)
         def sure_hesapla(row):
             try:
-                if "(" in str(row['Tür']) and "Saatlik" in str(row['Tür']):
+                if "Saatlik" in str(row['Tür']):
                     fmt = "%d/%m/%Y %H:%M"
                     bas = datetime.strptime(row['Başlangıç'], fmt)
                     bit = datetime.strptime(row['Dönüş'], fmt)
                     fark = bit - bas
-                    return f"{round(fark.seconds / 3600, 1)} Saat"
+                    return round(fark.seconds / 3600, 1) # Saat cinsinden sayı
                 else:
                     fmt = "%d/%m/%Y"
                     bas = datetime.strptime(row['Başlangıç'], fmt)
                     bit = datetime.strptime(row['Dönüş'], fmt)
                     fark = (bit - bas).days
-                    return f"{fark} Gün"
+                    return int(fark) # Gün cinsinden sayı
             except:
-                return "---"
+                return 0
 
-        df['Hesaplanan Süre'] = df.apply(sure_hesapla, axis=1)
+        df['Sure_Deger'] = df.apply(sure_hesapla, axis=1)
         df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay_Ismi'] = df['Tarih_Obj'].dt.strftime('%B %Y')
         return df
-    except:
+    except Exception as e:
+        st.error(f"Veri yükleme hatası: {e}")
         return pd.DataFrame()
 
-# --- MENÜ SEÇİMİ VE PERSONEL FORMU AYNI KALIYOR ---
+# --- MENÜ ---
 menu = st.sidebar.radio("MENÜ SEÇİMİ", ["⬇️ PERSONEL İZİN TALEBİ", "🔐 YÖNETİCİ PANELİ"])
 
 if menu == "⬇️ PERSONEL İZİN TALEBİ":
@@ -50,34 +51,15 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
         f1, f2 = st.columns(2)
         with f1:
             ad = st.text_input("Ad Soyad")
-            tc = st.text_input("TC Kimlik (Zorunlu)", max_chars=11)
-            brans = st.selectbox("Branş", ["Uzman Öğretici", "Öğretmen", "Psikolog", "Odyolog", "İdari", "Destek"])
-            tip = st.radio("Süre", ["Tam Gün", "Saatlik"], horizontal=True)
+            tc = st.text_input("TC Kimlik No", max_chars=11)
+            tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
         with f2:
-            tur = st.selectbox("Tür", ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin"])
+            tur = st.selectbox("Tür", ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin"])
             tar = st.date_input("İzin Tarihi")
             if tip == "Saatlik":
                 s1, s2 = st.columns(2)
                 saat1 = s1.time_input("Çıkış")
                 saat2 = s2.time_input("Dönüş")
-                bas = f"{tar.strftime('%d/%m/%Y')} {saat1.strftime('%H:%M')}"
-                bit = f"{tar.strftime('%d/%m/%Y')} {saat2.strftime('%H:%M')}"
+                bas, bit = f"{tar.strftime('%d/%m/%Y')} {saat1.strftime('%H:%M')}", f"{tar.strftime('%d/%m/%Y')} {saat2.strftime('%H:%M')}"
             else:
-                donus = st.date_input("İş Başı Tarihi")
-                bas = tar.strftime('%d/%m/%Y')
-                bit = donus.strftime('%d/%m/%Y')
-        
-        onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
-        if st.form_submit_button("TALEBİ GÖNDER"):
-            if ad and tc and onay:
-                p = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": brans, "tur": f"{tur} ({tip})", "bas": bas, "bit": bit}
-                requests.post(APPS_SCRIPT_URL, data=json.dumps(p))
-                st.success("Başarıyla gönderildi.")
-
-# --- YÖNETİCİ PANELİ GÜNCELLEMESİ ---
-else:
-    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
-    sifre = st.sidebar.text_input("Şifre", type="password")
-    
-    if sifre == "1234":
-        df = verileri_yukle()
+                donus = st.date_input
