@@ -75,4 +75,4 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
         onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
         if st.form_submit_button("TALEBİ GÖNDER"):
             if ad and tc and onay:
-                p = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans
+                p = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur
