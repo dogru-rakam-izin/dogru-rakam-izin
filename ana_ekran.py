@@ -47,7 +47,7 @@ if menu == "⬇️ PERSONEL":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
     ad, tc = st.text_input("Ad Soyad"), st.text_input("TC", max_chars=11)
     tip = st.radio("Süre", ["Tam Gün", "Saatlik"], horizontal=True)
-    with st.form("p_form_v_final"):
+    with st.form("p_form_v_final_fixed"):
         f1, f2 = st.columns(2)
         with f1: tur, tar = st.selectbox("Tür", IZIN_LISTESI), st.date_input("Tarih")
         with f2:
@@ -71,24 +71,40 @@ else:
         t1, t2 = st.tabs(["📊 Detaylı Karne", "📝 Manuel Kayıt"])
         with t1:
             if not df.empty:
-                aylar = sorted(df['Ay_Ismi'].dropna().unique(), reverse=True)
-                sec_ay = st.selectbox("Ay Seçin", aylar)
-                ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
-                
-                # Yeni Gruplama: Ad Soyad + İzin Türü bazlı
-                karne = ay_df.groupby(['Ad Soyad', 'Tür']).agg({
-                    'Gun_Deger': 'sum',
-                    'Saat_Deger': 'sum'
-                }).reset_index()
-                
-                karne.columns = ['Ad Soyad', 'İzin Türü', 'Toplam Gün', 'Toplam Saat']
-                
-                # Sayıları temizleme (2.0 -> 2)
-                for c in ['Toplam Gün', 'Toplam Saat']:
-                    karne[c] = karne[c].apply(lambda x: int(x) if x == int(x) else round(x, 1))
-                
-                st.subheader(f"🗓️ {sec_ay} Detaylı İzin Dağılımı")
-                st.table(karne)
-                
-                csv_data = karne.to_csv(index=False).encode('utf-8-sig')
-                st.download_button("📥 Detaylı Karneyi İndir (Excel/CSV)", csv_
+                ay_liste = df['Ay_Ismi'].dropna().unique()
+                if len(ay_liste) > 0:
+                    aylar = sorted(ay_liste, reverse=True)
+                    sec_ay = st.selectbox("Ay Seçin", aylar)
+                    ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
+                    
+                    # Detaylı Gruplama
+                    karne = ay_df.groupby(['Ad Soyad', 'Tür']).agg({'Gun_Deger': 'sum', 'Saat_Deger': 'sum'}).reset_index()
+                    karne.columns = ['Ad Soyad', 'İzin Türü', 'Toplam Gün', 'Toplam Saat']
+                    
+                    for c in ['Toplam Gün', 'Toplam Saat']:
+                        karne[c] = karne[c].apply(lambda x: int(x) if x == int(x) else round(x, 1))
+                    
+                    st.subheader(f"🗓️ {sec_ay} Detaylı İzin Dağılımı")
+                    st.table(karne)
+                    
+                    csv_down = karne.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button(label="📥 Karneyi İndir", data=csv_down, file_name=f"Karne_{sec_ay}.csv", mime='text/csv')
+                else: st.info("Bu ay için veri yok.")
+            else: st.info("Veri bulunamadı.")
+        with t2:
+            m_ad = st.text_input("Personel")
+            m_tip = st.radio("Tip", ["Tam Gün", "Saatlik"], key="admin_m_tip_fixed")
+            with st.form("m_form_v_fixed"):
+                m_tur, m_tar = st.selectbox("Tür", IZIN_LISTESI), st.date_input("Tarih")
+                if m_tip == "Saatlik":
+                    ms1, ms2 = st.time_input("Başla"), st.time_input("Bitir")
+                    m_bas, m_bit = f"{m_tar.strftime('%d/%m/%Y')} {ms1.strftime('%H:%M')}", f"{m_tar.strftime('%d/%m/%Y')} {ms2.strftime('%H:%M')}"
+                else:
+                    mdon = st.date_input("Dönüş")
+                    m_bas, m_bit = m_tar.strftime('%d/%m/%Y'), mdon.strftime('%d/%m/%Y')
+                if st.form_submit_button("Kaydet"):
+                    if m_ad:
+                        m_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": "000", "ad": m_ad, "brans": "Yön", "tur": f"{m_tur} ({m_tip})", "bas": m_bas, "bit": m_bit}
+                        requests.post(APPS_SCRIPT_URL, data=json.dumps(m_data))
+                        st.success("Eklendi!"); st.rerun()
+    elif sifre != "": st.error("Hatalı!")
