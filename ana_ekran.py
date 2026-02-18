@@ -4,7 +4,7 @@ import requests
 import json
 from datetime import datetime
 
-# --- YAPILANDIRMA ---
+# --- AYARLAR ---
 URL = "https://script.google.com/macros/s/AKfycbyz1FkOaVRpkSAQoJrhaZcXsu_qQuYN-Y18S-yQblLIUqGBlFgoryoNW4eLfw8d0DZ1/exec"
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
@@ -32,28 +32,22 @@ def yukle():
         return df
     except: return pd.DataFrame()
 
-def yazdir_html(baslik, icerik):
-    html = f"""
-    <html>
-    <head>
-        <style>
-            @page {{ size: A4; margin: 20mm; }}
-            body {{ font-family: 'Times New Roman', serif; line-height: 1.6; color: #000; padding: 20px; }}
-            .header {{ text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 10px; }}
-            .content {{ white-space: pre-wrap; font-size: 14px; text-align: justify; }}
-            @media print {{ header, footer, .no-print {{ display: none !important; }} }}
-        </style>
-    </head>
-    <body onload="window.print();">
-        <div class="header">{baslik}</div>
-        <div class="content">{icerik}</div>
-    </body>
-    </html>
-    """
-    st.components.v1.html(html, height=0)
+def yazdir_html(bas, ic):
+    ht = f"<html><head><style>body{{font-family:'Times New Roman';padding:40px;line-height:1.6;}} .h{{text-align:center;font-weight:bold;margin-bottom:20px;border-bottom:2px solid #000;}} .c{{white-space:pre-wrap;text-align:justify;}} @media print{{.no{{display:none;}}}}</style></head><body onload='window.print()'><div class='h'>{bas}</div><div class='c'>{ic}</div></body></html>"
+    st.components.v1.html(ht, height=0)
 
 m = st.sidebar.radio("MENÜ", ["⬇️ PERSONEL", "🔐 YÖNETİCİ"])
 
 if m == "⬇️ PERSONEL":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
-    ad, tc = st.text_input("Ad Soyad"), st.text_input("TC No", max_chars=
+    ad = st.text_input("Ad Soyad")
+    tc = st.text_input("TC No", max_chars=11)
+    tp = st.radio("Tip", ["Tam Gün", "Saatlik"], horizontal=True)
+    with st.form("p"):
+        t1, t2 = st.selectbox("Tür", IZ), st.date_input("Başla")
+        if tp == "Saatlik":
+            s1, s2 = st.time_input("Çıkış"), st.time_input("Dönüş")
+            b, d = f"{t2.strftime('%d/%m/%Y')} {s1.strftime('%H:%M')}", f"{t2.strftime('%d/%m/%Y')} {s2.strftime('%H:%M')}"
+        else:
+            dn = st.date_input("İş Başı")
+            b, d = t
