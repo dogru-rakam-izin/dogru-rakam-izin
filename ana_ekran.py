@@ -61,17 +61,56 @@ if menu == "⬇️ PERSONEL":
             if ad and tc:
                 p_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str}
                 requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
-                st.success("İletildi!"); st.balloons()
+                st.success("Talep İletildi!"); st.balloons()
 
 else:
     st.title("🔐 YÖNETİCİ PANELİ")
-    sifre = st.sidebar.text_input("Şifre", type="password")
+    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
     if sifre == "1234":
         df = verileri_yukle()
         t1, t2, t3 = st.tabs(["📊 Aylık Karne", "👤 Personel Sicili", "📝 Manuel Kayıt"])
+        
         with t1:
+            st.subheader("📊 Aylık İzin Özetleri")
             if not df.empty:
-                aylar = sorted(df['Ay_Ismi'].dropna().unique(), reverse=True)
-                sec_ay = st.selectbox("Ay Seçin", aylar)
+                ay_l = sorted(df['Ay_Ismi'].dropna().unique(), reverse=True)
+                sec_ay = st.selectbox("Görüntülenecek Ay", ay_l)
                 ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
                 karne = ay_df.groupby(['Ad Soyad', 'Tür']).agg({'Gun_Deger': 'sum', 'Saat_Deger': 'sum'}).reset_index()
+                karne.columns = ['Personel', 'İzin Türü', 'Gün', 'Saat']
+                st.table(karne)
+                st.download_button("📥 Karneyi İndir", karne.to_csv(index=False).encode('utf-8-sig'), f"Karne_{sec_ay}.csv", "text/csv")
+            else: st.info("Veri bulunmuyor.")
+
+        with t2:
+            st.subheader("👤 Bireysel Personel Geçmişi")
+            if not df.empty:
+                p_l = sorted(df['Ad Soyad'].unique())
+                p_sec = st.selectbox("Personel Seç", p_l)
+                p_gecmis = df[df['Ad Soyad'] == p_sec].copy()
+                c1, c2 = st.columns(2)
+                c1.metric("Toplam Gün İzni", int(p_gecmis['Gun_Deger'].sum()))
+                c2.metric("Toplam Saatlik İzin", p_gecmis['Saat_Deger'].sum())
+                st.dataframe(p_gecmis[['Başlangıç', 'Dönüş', 'Tür', 'Gun_Deger', 'Saat_Deger']], use_container_width=True)
+            else: st.info("Sorgulanacak veri bulunmuyor.")
+
+        with t3:
+            st.subheader("📝 Manuel Kayıt Ekleme")
+            m_ad = st.text_input("Kayıt Edilecek Personel")
+            m_tip = st.radio("İzin Tipi", ["Tam Gün", "Saatlik"], key="admin_m_tip")
+            with st.form("manuel_ekleme_formu"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    m_tur = st.selectbox("İzin Nedeni", IZIN_LISTESI)
+                    m_tar = st.date_input("Başlangıç Tarihi")
+                with col2:
+                    if m_tip == "Saatlik":
+                        ms1, ms2 = st.time_input("Başlangıç Saati"), st.time_input("Bitiş Saati")
+                        m_bas, m_bit = f"{m_tar.strftime('%d/%m/%Y')} {ms1.strftime('%H:%M')}", f"{m_tar.strftime('%d/%m/%Y')} {ms2.strftime('%H:%M')}"
+                    else:
+                        m_don = st.date_input("İşe Dönüş Tarihi")
+                        m_bas, m_bit = m_tar.strftime('%d/%m/%Y'), m_don.strftime('%d/%m/%Y')
+                
+                if st.form_submit_button("Sisteme İşle"):
+                    if m_ad:
+                        m_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": "000", "ad": m_ad, "brans": "Yönetici", "tur": f"{m_tur} ({m_tip})", "bas": m_bas, "bit":
