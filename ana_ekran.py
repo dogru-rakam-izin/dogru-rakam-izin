@@ -55,15 +55,14 @@ menu = st.sidebar.radio("MENÜ SEÇİMİ", ["⬇️ PERSONEL İZİN TALEBİ", "�
 if menu == "⬇️ PERSONEL İZİN TALEBİ":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
     
-    # SAAT SORUNUNU ÇÖZEN KRİTİK NOKTA: 'tip' seçimi formun dışında olmalı
+    # Seçim formun dışında olmalı ki sayfa anında yenilenip saatleri getirsin
     ad = st.text_input("Ad Soyad")
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("personel_formu_v_son"):
+    with st.form("personel_formu_kesin_son"):
         f1, f2 = st.columns(2)
         with f1:
-            # Hata veren liste burada düzeltildi:
             tur = st.selectbox("Tür", ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin"])
             tar = st.date_input("İzin Tarihi")
             
@@ -84,7 +83,6 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
         
         if submit:
             if ad and tc and onay:
+                # Syntax hatasını düzelten tam sözlük yapısı:
                 p_data = {
-                    "tarih": datetime.now().strftime("%d/%m/%Y"), 
-                    "tc": str(tc), "ad": ad, "brans": "Personel", 
-                    "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str
+                    "tari
