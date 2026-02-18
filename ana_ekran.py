@@ -93,4 +93,26 @@ else:
                         mb, md = f"{t_f} {ms1.strftime(F_SAAT)}", f"{t_f} {ms2.strftime(F_SAAT)}"
                     else:
                         m_dn = st.date_input("İş Başı ")
-                        mb, md = t_f, m_dn.strftime(F_TARI
+                        mb, md = t_f, m_dn.strftime(F_TARIH)
+                    if st.form_submit_button("KAYDI EKLE") and m_ad:
+                        now = datetime.now().strftime(F_TARIH)
+                        p_m = {"tarih":now,"tc":"0","ad":m_ad,"brans":"Y","tur":f"{tr} ({m_tp})","bas":mb,"bit":md}
+                        requests.post(URL, data=json.dumps(p_m))
+                        st.success("Kayıt başarıyla eklendi!"); st.rerun()
+            with t[3]:
+                st.subheader("Yıllık İzin Durum Çizelgesi")
+                py = st.selectbox("Sorgulanacak Personel", sorted(df['Ad Soyad'].unique()), key="py")
+                gt = st.date_input("İşe Giriş Tarihi", value=datetime(2023, 1, 1))
+                kd = (2026 - gt.year)
+                hk = hakedis_bul(kd)
+                df_yil = df[(df['Ad Soyad']==py) & (df['Tür'].str.contains("Yıllık", na=False))]
+                ku = df_yil['G'].sum()
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Toplam Hak", f"{hk} Gün")
+                c2.metric("Kullanılan", f"{ku:.1f} Gün")
+                c3.metric("Kalan İzin", f"{hk-ku:.1f} Gün")
+                if not df_yil.empty: 
+                    st.write("Kullanılan Yıllık İzin Detayları:")
+                    st.dataframe(df_yil[['Başlangıç', 'Dönüş', 'G']])
+        else: st.warning("Henüz veri girişi yapılmamış.")
+    else: st.info("Lütfen işlem yapmak için şifrenizi giriniz.")
