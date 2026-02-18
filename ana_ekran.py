@@ -87,8 +87,8 @@ else:
                         ms1, ms2 = st.time_input("C1"), st.time_input("C2")
                         mb, md = f"{t_f} {ms1.strftime('%H:%M')}", f"{t_f} {ms2.strftime('%H:%M')}"
                     else:
-                        m_dn = st.date_input("Dönüş")
-                        mb, md = t_f, m_dn.strftime('%d/%m/%Y')
+                        m_don = st.date_input("Dönüş")
+                        mb, md = t_f, m_don.strftime('%d/%m/%Y')
                     if st.form_submit_button("KAYDET") and m_ad:
                         now = datetime.now().strftime("%d/%m/%Y")
                         p_m = {"tarih":now,"tc":"0","ad":m_ad,"brans":"Y","tur":f"{tr} ({m_tp})","bas":mb,"bit":md}
@@ -98,11 +98,11 @@ else:
                 st.subheader("Yıllık İzin Detaylı Takip")
                 py = st.selectbox("Personel", sorted(df['Ad Soyad'].unique()), key="py")
                 gt = st.date_input("İşe Giriş", value=datetime(2023, 1, 1))
-                kd = (datetime.now().year - gt.year)
+                # --- GÜNCEL YIL: 2026 ---
+                kd = (2026 - gt.year)
                 hk = 14 if kd < 5 else 20 if kd < 15 else 26
                 if kd < 1: hk = 0
                 
-                # Önemli: İçinde "Yıllık İzin" geçen tüm kayıtları topla
                 yil_filtre = (df['Ad Soyad'] == py) & (df['Tür'].str.contains("Yıllık İzin", na=False))
                 df_yil = df[yil_filtre].copy()
                 ku = df_yil['G'].sum()
@@ -114,4 +114,4 @@ else:
                 
                 if not df_yil.empty:
                     st.write("Kullanılan İzinlerin Listesi:")
-                    st.dataframe(df_yil[['Başlangıç', 'Dönüş', 'G']])
+                    st.dataframe(df_yil[['Başlangıç', 'Dönüş', '
