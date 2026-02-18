@@ -42,11 +42,9 @@ def verileri_yukle():
 
         df['Sure_Deger'] = df.apply(sure_hesapla, axis=1)
         df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
-        
         df['Ay_Ing'] = df['Tarih_Obj'].dt.strftime('%B')
         df['Yil'] = df['Tarih_Obj'].dt.strftime('%Y')
         df['Ay_Ismi'] = df['Ay_Ing'].map(TR_AYLAR) + " " + df['Yil']
-        
         return df
     except:
         return pd.DataFrame()
@@ -92,13 +90,8 @@ else:
             
             with tab1:
                 aylar = sorted(df['Ay_Ismi'].dropna().unique())
-                secilen_ay = st.selectbox("Analiz Edilecek Ayı Seçin", aylar)
-                ay_df = df[df['Ay_Ismi'] == secilen_ay].copy()
-                
-                ay_df['Günlük'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" not in str(x['Tür']) else 0, axis=1)
-                ay_df['Saatlik'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" in str(x['Tür']) else 0, axis=1)
-                
-                ozet_tablo = ay_df.groupby('Ad Soyad').agg({
-                    'Günlük': 'sum',
-                    'Saatlik': 'sum',
-                    'Tür':
+                if aylar:
+                    secilen_ay = st.selectbox("Analiz Edilecek Ayı Seçin", aylar)
+                    ay_df = df[df['Ay_Ismi'] == secilen_ay].copy()
+                    
+                    ay_df['Günlük'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" not in str(x['Tür']) else
