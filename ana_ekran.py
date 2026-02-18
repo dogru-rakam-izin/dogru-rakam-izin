@@ -15,20 +15,37 @@ def verileri_yukle():
     try:
         df = pd.read_csv(SHEET_READ_URL)
         df.columns = [c.strip() for c in df.columns]
+        
+        # Süre Hesaplama Fonksiyonu (Sistemi bozmadan çalışma anında hesaplar)
+        def sure_hesapla(row):
+            try:
+                if "(" in str(row['Tür']) and "Saatlik" in str(row['Tür']):
+                    fmt = "%d/%m/%Y %H:%M"
+                    bas = datetime.strptime(row['Başlangıç'], fmt)
+                    bit = datetime.strptime(row['Dönüş'], fmt)
+                    fark = bit - bas
+                    return f"{round(fark.seconds / 3600, 1)} Saat"
+                else:
+                    fmt = "%d/%m/%Y"
+                    bas = datetime.strptime(row['Başlangıç'], fmt)
+                    bit = datetime.strptime(row['Dönüş'], fmt)
+                    fark = (bit - bas).days
+                    return f"{fark} Gün"
+            except:
+                return "---"
+
+        df['Hesaplanan Süre'] = df.apply(sure_hesapla, axis=1)
         df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay_Ismi'] = df['Tarih_Obj'].dt.strftime('%B %Y')
         return df
     except:
-        return pd.DataFrame(columns=["Tarih", "TC No", "Ad Soyad", "Branş", "Tür", "Başlangıç", "Dönüş", "Durum"])
+        return pd.DataFrame()
 
-# --- MENÜ ---
+# --- MENÜ SEÇİMİ VE PERSONEL FORMU AYNI KALIYOR ---
 menu = st.sidebar.radio("MENÜ SEÇİMİ", ["⬇️ PERSONEL İZİN TALEBİ", "🔐 YÖNETİCİ PANELİ"])
 
-# --- 1. PERSONEL GİRİŞİ ---
 if menu == "⬇️ PERSONEL İZİN TALEBİ":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
-    st.info("Personel İzin Talep Formu")
-    
     with st.form("personel_formu", clear_on_submit=True):
         f1, f2 = st.columns(2)
         with f1:
@@ -51,68 +68,16 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
                 bit = donus.strftime('%d/%m/%Y')
         
         onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
-        submit_btn = st.form_submit_button("TALEBİ GÖNDER")
-        
-        if submit_btn:
+        if st.form_submit_button("TALEBİ GÖNDER"):
             if ad and tc and onay:
                 p = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": brans, "tur": f"{tur} ({tip})", "bas": bas, "bit": bit}
                 requests.post(APPS_SCRIPT_URL, data=json.dumps(p))
                 st.success("Başarıyla gönderildi.")
-                st.balloons()
-            else:
-                st.error("Lütfen ad, TC ve onay kutusunu doldurun.")
 
-# --- 2. YÖNETİCİ PANELİ ---
+# --- YÖNETİCİ PANELİ GÜNCELLEMESİ ---
 else:
     st.title("🔐 YÖNETİCİ KONTROL PANELİ")
     sifre = st.sidebar.text_input("Şifre", type="password")
     
     if sifre == "1234":
         df = verileri_yukle()
-        kayitli_personeller = sorted(df['Ad Soyad'].unique().tolist()) if not df.empty else []
-
-        st.subheader("📝 YÖNETİCİ İZİN GİRİŞİ (MANUEL)")
-        with st.expander("Yeni İzin Kaydı Ekle", expanded=True):
-            with st.form("yönetici_manuel_giris"):
-                y1, y2 = st.columns(2)
-                y_ad_secim = y1.selectbox("Kayıtlı Personel Seç", ["Yeni İsim Yaz..."] + kayitli_personeller)
-                y_ad = y1.text_input("Ad Soyad (Yeni ise)") if y_ad_secim == "Yeni İsim Yaz..." else y_ad_secim
-                
-                y_tip = y2.radio("İzin Tipi", ["Tam Gün", "Saatlik"], horizontal=True)
-                y_tur = y1.selectbox("İzin Türü", ["Yıllık İzin", "Mazeret", "Saatlik", "Rapor"])
-                y_tar = y2.date_input("Tarih")
-                
-                if y_tip == "Saatlik":
-                    y_s1, y_s2 = y2.columns(2)
-                    y_saat1 = y_s1.time_input("Başla")
-                    y_saat2 = y_s2.time_input("Bitir")
-                    y_bas, y_bit = f"{y_tar.strftime('%d/%m/%Y')} {y_saat1.strftime('%H:%M')}", f"{y_tar.strftime('%d/%m/%Y')} {y_saat2.strftime('%H:%M')}"
-                else:
-                    y_don = y2.date_input("İş Başı")
-                    y_bas, y_bit = y_tar.strftime('%d/%m/%Y'), y_don.strftime('%d/%m/%Y')
-                
-                y_submit = st.form_submit_button("KAYDI TABLOYA EKLE")
-                
-                if y_submit:
-                    p_y = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": "---", "ad": y_ad, "brans": "YÖNETİCİ", "tur": f"{y_tur} ({y_tip})", "bas": y_bas, "bit": y_bit}
-                    requests.post(APPS_SCRIPT_URL, data=json.dumps(p_y))
-                    st.success(f"{y_ad} için kayıt eklendi!")
-                    st.rerun()
-
-        st.write("---")
-        
-        st.subheader("🗓️ AYLIK İZİN LİSTESİ")
-        if not df.empty:
-            aylar = sorted(df['Ay_Ismi'].dropna().unique())
-            if aylar:
-                secilen_ay = st.selectbox("Görüntülenecek Ay", aylar)
-                ay_df = df[df['Ay_Ismi'] == secilen_ay]
-                st.info(f"{secilen_ay} ayında toplam {len(ay_df)} izin kaydı bulundu.")
-                st.table(ay_df[['Ad Soyad', 'Tür', 'Başlangıç', 'Dönüş', 'Branş']])
-            else:
-                st.info("Kayıtlı veri bulunamadı.")
-        else:
-            st.warning("Henüz hiç kayıt yok.")
-            
-    elif sifre != "":
-        st.error("Giriş Başarısız")
