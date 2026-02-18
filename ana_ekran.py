@@ -18,30 +18,27 @@ def yukle():
     try:
         df = pd.read_csv(CSV)
         if df.empty: return pd.DataFrame()
-        # Sütun isimlerindeki boşlukları temizle
         df.columns = [c.strip() for c in df.columns]
         
-        # Gerekli sütunlar var mı kontrol et
-        gerekliler = ["Ad Soyad", "Tür", "Başlangıç", "Dönüş"]
-        for g in gerekliler:
-            if g not in df.columns:
-                st.error(f"Eksik Sütun: {g}. Lütfen Google Sheets başlığını kontrol edin.")
-                return pd.DataFrame()
-
         def h(r):
             try:
                 f = "%d/%m/%Y %H:%M" if "Saatlik" in str(r['Tür']) else "%d/%m/%Y"
                 b, d = datetime.strptime(str(r['Başlangıç']), f), datetime.strptime(str(r['Dönüş']), f)
-                if "Saatlik" in str(r['Tür']): return 0, round((d-b).seconds/3600,1)
+                if "Saatlik" in str(r['Tür']): 
+                    return 0, round((d-b).total_seconds()/3600, 1)
                 return (d-b).days, 0
             except: return 0, 0
             
         df[['G', 'S']] = df.apply(lambda r: pd.Series(h(r)), axis=1)
+        # Ondalıkları temizle (2.0000 yerine 2 yap)
+        df['G'] = df['G'].astype(float)
+        df['S'] = df['S'].astype(float)
+        
         df['T'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay'] = df['T'].dt.strftime('%B').map(TR) + " " + df['T'].dt.strftime('%Y')
         return df
     except Exception as e:
-        st.error(f"Bağlantı Hatası: {e}")
+        st.error(f"Hata: {e}")
         return pd.DataFrame()
 
 m = st.sidebar.radio("MENÜ", ["⬇️ PERSONEL", "🔐 YÖNETİCİ"])
@@ -56,7 +53,7 @@ if m == "⬇️ PERSONEL":
             s1, s2 = st.time_input("Çıkış"), st.time_input("Dönüş")
             b, d = f"{t2.strftime('%d/%m/%Y')} {s1.strftime('%H:%M')}", f"{t2.strftime('%d/%m/%Y')} {s2.strftime('%H:%M')}"
         else:
-            dn = st.date_input("İş Başı")
+            dn = st.date_input("Dönüş")
             b, d = t2.strftime('%d/%m/%Y'), dn.strftime('%d/%m/%Y')
         if st.form_submit_button("GÖNDER") and ad:
             requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}))
@@ -71,15 +68,17 @@ else:
             with tab1:
                 ay_l = df['Ay'].dropna().unique()
                 if len(ay_l) > 0:
-                    ay = st.selectbox("Ay", sorted(ay_l, reverse=True))
+                    ay = st.selectbox("Ay Seç", sorted(ay_l, reverse=True))
                     kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
-                    st.table(kn)
-                else: st.info("Ay bilgisi bulunamadı.")
+                    # Rakamları güzelleştir
+                    kn.columns = ['Ad Soyad', 'Tür', 'Gün', 'Saat']
+                    st.table(kn.style.format({"Gün": "{:.1f}", "Saat": "{:.1f}"}))
+                else: st.info("Veri yok.")
             with tab2:
                 p = st.selectbox("Kişi", sorted(df['Ad Soyad'].unique()))
                 f = df[df['Ad Soyad']==p]
-                st.metric("Toplam Gün", int(f['G'].sum()))
-                st.dataframe(f[['Başlangıç','Dönüş','Tür','G','S']])
+                st.metric("Toplam Gün", f"{f['G'].sum():.1f}")
+                st.dataframe(f[['Başlangıç','Dönüş','Tür','G','S']].style.format({"G": "{:.1f}", "S": "{:.1f}"}))
             with tab3:
                 ma, mt = st.text_input("İsim"), st.radio("Tip", ["Tam Gün", "Saatlik"])
                 with st.form("m"):
