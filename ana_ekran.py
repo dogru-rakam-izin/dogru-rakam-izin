@@ -16,21 +16,35 @@ IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ü
 
 def yukle():
     try:
+        # Veriyi çek ve sütun başlıklarındaki boşlukları temizle
         df = pd.read_csv(CSV)
-        if df.empty: return pd.DataFrame()
+        if df.empty: 
+            return pd.DataFrame()
         df.columns = [c.strip() for c in df.columns]
+        
+        # Hesaplama fonksiyonu
         def h(r):
             try:
                 f = "%d/%m/%Y %H:%M" if "Saatlik" in str(r['Tür']) else "%d/%m/%Y"
-                b, d = datetime.strptime(str(r['Başlangıç']), f), datetime.strptime(str(r['Dönüş']), f)
-                if "Saatlik" in str(r['Tür']): return 0, round((d-b).total_seconds()/3600, 1)
+                b = datetime.strptime(str(r['Başlangıç']), f)
+                d = datetime.strptime(str(r['Dönüş']), f)
+                if "Saatlik" in str(r['Tür']): 
+                    return 0, round((d-b).total_seconds()/3600, 1)
                 return (d-b).days, 0
-            except: return 0, 0
-        df[['G', 'S']] = df.apply(lambda r: pd.Series(h(r)), axis=1)
+            except: 
+                return 0, 0
+
+        # Yeni sütunları ekle
+        res = df.apply(lambda r: pd.Series(h(r)), axis=1)
+        df['G'], df['S'] = res[0], res[1]
+        
+        # Tarih ve Ay işlemleri
         df['T'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay'] = df['T'].dt.strftime('%B').map(TR) + " " + df['T'].dt.strftime('%Y')
         return df
-    except: return pd.DataFrame()
+    except Exception as e:
+        st.sidebar.error(f"Veri yükleme hatası: {e}")
+        return pd.DataFrame()
 
 m = st.sidebar.radio("MENÜ", ["⬇️ PERSONEL", "🔐 YÖNETİCİ"])
 
@@ -55,11 +69,45 @@ else:
     st.title("🔐 YÖNETİCİ PANELİ")
     if st.sidebar.text_input("Şifre", type="password") == "1234":
         df = yukle()
-        tabs = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "📅 Yıllık İzin Takip"])
         
-        with tabs[0]: # Karne
-            if not df.empty:
-                ay_list = sorted(df['Ay'].dropna().unique(), reverse=True)
-                ay = st.selectbox("Ay", ay_list)
-                kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
-                st
+        if df.empty:
+            st.warning("⚠️ Google Sheets'ten veri alınamadı. Lütfen tablonuzun boş olmadığından ve paylaşıma açık olduğundan emin olun.")
+        else:
+            tabs = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "📅 Yıllık İzin Takip"])
+            
+            with tabs[0]: # Karne
+                ay_listesi = sorted(df['Ay'].dropna().unique(), reverse=True)
+                if ay_listesi:
+                    ay = st.selectbox("Ay Seçin", ay_listesi)
+                    kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
+                    st.table(kn.style.format({"G": "{:.1f}", "S": "{:.1f}"}))
+                else:
+                    st.info("Bu ay için henüz kayıtlı veri yok.")
+
+            with tabs[1]: # Sicil
+                ps = sorted(df['Ad Soyad'].unique())
+                p = st.selectbox("Personel Listesi", ps)
+                st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']])
+
+            with tabs[2]: # Manuel Kayıt
+                ma = st.text_input("İsim")
+                mtp = st.radio("İzin Tipi", ["Tam Gün", "Saatlik"], horizontal=True)
+                with st.form("m"):
+                    tr, ta = st.selectbox("Tür ", IZ), st.date_input("Tarih ")
+                    if mtp == "Saatlik":
+                        ms1, ms2 = st.time_input("Çıkış "), st.time_input("Dönüş ")
+                        mb, md = f"{ta.strftime('%d/%m/%Y')} {ms1.strftime('%H:%M')}", f"{ta.strftime('%d/%m/%Y')} {ms2.strftime('%H:%M')}"
+                    else:
+                        tdn = st.date_input("İş Başı ")
+                        mb, md = ta.strftime('%d/%m/%Y'), tdn.strftime('%d/%m/%Y')
+                    if st.form_submit_button("SİSTEME İŞLE") and ma:
+                        requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":"0","ad":ma,"brans":"Y","tur":f"{tr} ({mtp})","bas":mb,"bit":md}))
+                        st.success("Eklendi!"); st.rerun()
+
+            with tabs[3]: # Yıllık İzin Takip
+                st.subheader("Yıllık İzin Hak ediş")
+                personel_listesi = sorted(df['Ad Soyad'].unique())
+                secilen_p = st.selectbox("Personel", personel_listesi, key="y_p")
+                giris_tarihi = st.date_input("İşe Giriş", value=datetime(2023, 1, 1))
+                bugun = datetime.now()
+                kidem = (bugun.year -
