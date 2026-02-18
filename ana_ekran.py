@@ -61,7 +61,7 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("p_form_fix"):
+    with st.form("p_form_final_v4"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
@@ -102,7 +102,6 @@ else:
                     karne = ay_df.groupby('Ad Soyad').agg({'Gun_Deger': 'sum', 'Saat_Deger': 'sum', 'Tür': 'count'})
                     karne.columns = ['Toplam Gün', 'Toplam Saat', 'Kayıt Sayısı']
                     
-                    # 2.0 -> 2 formatlaması
                     karne['Toplam Gün'] = karne['Toplam Gün'].apply(lambda x: int(x) if x == int(x) else round(x, 1))
                     karne['Toplam Saat'] = karne['Toplam Saat'].apply(lambda x: int(x) if x == int(x) else round(x, 1))
                     
@@ -110,13 +109,35 @@ else:
                     st.write("---")
                     st.dataframe(ay_df[['Ad Soyad', 'Tür', 'Başlangıç', 'Dönüş', 'Gun_Deger', 'Saat_Deger']])
                 else:
-                    st.info("Henüz bu ay için kayıt yok.")
+                    st.info("Henüz bu ay için veri yok.")
             else:
-                st.info("Henüz kayıt bulunmuyor.")
+                st.info("Veritabanı boş.")
 
         with tab2:
             st.subheader("📝 Manuel İzin Girişi")
             m_ad = st.text_input("Personel Adı Soyadı")
-            m_tip = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], key="m_key_fix")
+            m_tip = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], key="m_key_v4")
             
-            with st.
+            with st.form("m_form_final_v4"):
+                m_tur = st.selectbox("İzin Türü", IZIN_LISTESI)
+                m_tar = st.date_input("İzin Tarihi")
+                if m_tip == "Saatlik":
+                    m_s1 = st.time_input("Başla")
+                    m_s2 = st.time_input("Bitir")
+                    m_bas = f"{m_tar.strftime('%d/%m/%Y')} {m_s1.strftime('%H:%M')}"
+                    m_bit = f"{m_tar.strftime('%d/%m/%Y')} {m_s2.strftime('%H:%M')}"
+                else:
+                    m_don = st.date_input("İş Başı")
+                    m_bas = m_tar.strftime('%d/%m/%Y')
+                    m_bit = m_don.strftime('%d/%m/%Y')
+                
+                if st.form_submit_button("Sisteme Manuel Kaydet"):
+                    if m_ad:
+                        m_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": "000", "ad": m_ad, "brans": "Yönetici", "tur": f"{m_tur} ({m_tip})", "bas": m_bas, "bit": m_bit}
+                        requests.post(APPS_SCRIPT_URL, data=json.dumps(m_data))
+                        st.success("Kayıt eklendi!")
+                        st.rerun()
+                    else:
+                        st.error("İsim girilmesi zorunludur.")
+    elif sifre != "":
+        st.error("Hatalı Şifre!")
