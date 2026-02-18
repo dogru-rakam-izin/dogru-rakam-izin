@@ -69,7 +69,7 @@ if m == "PERSONEL GİRİŞİ":
 
 else:
     st.title("🔐 YÖNETİCİ PANELİ")
-    if st.sidebar.text_input("Yönetici Şifresi", type="password") == "1234":
+    if st.sidebar.text_input("Yönetici Şifresi", type="password") == "Dr2020":
         df = yukle()
         if not df.empty:
             t = st.tabs(["📊 Karne", "👤 Personel Sicil", "📝 Manuel Kayıt", "📅 Yıllık İzin Takibi"])
@@ -116,3 +116,4 @@ else:
                     st.dataframe(df_yil[['Başlangıç', 'Dönüş', 'G']])
         else: st.warning("Henüz veri girişi yapılmamış.")
     else: st.info("Lütfen işlem yapmak için şifrenizi giriniz.")
+
