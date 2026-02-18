@@ -11,6 +11,13 @@ SHEET_READ_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx
 
 st.set_page_config(page_title="Doğru Rakam İzin Sistemi", layout="wide")
 
+# Türkçe Ay Sözlüğü
+TR_AYLAR = {
+    "January": "Ocak", "February": "Şubat", "March": "Mart", "April": "Nisan",
+    "May": "Mayıs", "June": "Haziran", "July": "Temmuz", "August": "Ağustos",
+    "September": "Eylül", "October": "Ekim", "November": "Kasım", "December": "Aralık"
+}
+
 def verileri_yukle():
     try:
         df = pd.read_csv(SHEET_READ_URL)
@@ -23,19 +30,26 @@ def verileri_yukle():
                     bas = datetime.strptime(row['Başlangıç'], fmt)
                     bit = datetime.strptime(row['Dönüş'], fmt)
                     fark = bit - bas
-                    return round(fark.seconds / 3600, 1)
+                    # Saati net sayı olarak döndür (örn: 2.5)
+                    return float(round(fark.seconds / 3600, 1))
                 else:
                     fmt = "%d/%m/%Y"
                     bas = datetime.strptime(row['Başlangıç'], fmt)
                     bit = datetime.strptime(row['Dönüş'], fmt)
                     fark = (bit - bas).days
+                    # Günü net sayı olarak döndür (örn: 5)
                     return int(fark)
             except:
                 return 0
 
         df['Sure_Deger'] = df.apply(sure_hesapla, axis=1)
         df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
-        df['Ay_Ismi'] = df['Tarih_Obj'].dt.strftime('%B %Y')
+        
+        # Ay ismini al ve Türkçeye çevir
+        df['Ay_Ing'] = df['Tarih_Obj'].dt.strftime('%B')
+        df['Yil'] = df['Tarih_Obj'].dt.strftime('%Y')
+        df['Ay_Ismi'] = df['Ay_Ing'].map(TR_AYLAR) + " " + df['Yil']
+        
         return df
     except:
         return pd.DataFrame()
@@ -85,7 +99,6 @@ else:
                 secilen_ay = st.selectbox("Analiz Edilecek Ayı Seçin", aylar)
                 ay_df = df[df['Ay_Ismi'] == secilen_ay].copy()
                 
-                # Personel Bazlı Özetleme Hesaplama
                 ay_df['Günlük'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" not in str(x['Tür']) else 0, axis=1)
                 ay_df['Saatlik'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" in str(x['Tür']) else 0, axis=1)
                 
@@ -95,44 +108,21 @@ else:
                     'Tür': 'count'
                 }).rename(columns={'Tür': 'İzin Adedi', 'Günlük': 'Toplam Gün', 'Saatlik': 'Toplam Saat'})
                 
-                st.write(f"### 🗓️ {secilen_ay} Ayı Personel İzin Karnesi")
+                # Sayı formatını düzeltme (5.000 -> 5)
+                ozet_tablo['Toplam Gün'] = ozet_tablo['Toplam Gün'].astype(int)
+                ozet_tablo['Toplam Saat'] = ozet_tablo['Toplam Saat'].apply(lambda x: int(x) if x == int(x) else x)
+
+                st.write(f"### 🗓️ {secilen_ay} Personel İzin Karnesi")
                 st.table(ozet_tablo)
                 
-                # İNDİRME BUTONU
                 csv = ozet_tablo.to_csv(index=True).encode('utf-16')
                 st.download_button(
-                    label="📥 Özet Listeyi İndir (Excel/CSV)",
+                    label=f"📥 {secilen_ay} Özetini İndir",
                     data=csv,
-                    file_name=f"{secilen_ay}_izin_ozeti.csv",
+                    file_name=f"{secilen_ay}_ozet.csv",
                     mime="text/csv",
                 )
                 
                 st.write("---")
-                st.write("🔍 **Ay İçindeki Tüm Hareketler (Detay):**")
-                st.dataframe(ay_df[['Ad Soyad', 'Tür', 'Başlangıç', 'Dönüş', 'Sure_Deger']])
-
-            with tab2:
-                with st.form("admin_manuel_giris", clear_on_submit=True):
-                    st.subheader("Yeni Kayıt Ekle")
-                    y_ad = st.text_input("Personel Ad Soyad")
-                    y_tip = st.radio("Tip", ["Tam Gün", "Saatlik"], horizontal=True)
-                    y_tur = st.selectbox("Tür", ["Yıllık", "Mazeret", "Saatlik", "Rapor"])
-                    y_tar = st.date_input("Tarih")
-                    if y_tip == "Saatlik":
-                        s1, s2 = st.columns(2)
-                        y_saat1 = s1.time_input("Başla")
-                        y_saat2 = s2.time_input("Bitir")
-                        y_bas, y_bit = f"{y_tar.strftime('%d/%m/%Y')} {y_saat1.strftime('%H:%M')}", f"{y_tar.strftime('%d/%m/%Y')} {y_saat2.strftime('%H:%M')}"
-                    else:
-                        y_don = st.date_input("Dönüş")
-                        y_bas, y_bit = y_tar.strftime('%d/%m/%Y'), y_don.strftime('%d/%m/%Y')
-                    
-                    if st.form_submit_button("Sisteme Kaydet"):
-                        p_y = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": "---", "ad": y_ad, "brans": "Yönetici", "tur": f"{y_tur} ({y_tip})", "bas": y_bas, "bit": y_bit}
-                        requests.post(APPS_SCRIPT_URL, data=json.dumps(p_y))
-                        st.success("Kaydedildi!")
-                        st.rerun()
-        else:
-            st.warning("Veritabanı boş.")
-    elif sifre != "":
-        st.error("Hatalı Şifre!")
+                st.write("🔍 **Detaylı Hareket Listesi:**")
+                st.dataframe(ay_df[['Ad Soyad', 'Tür', 'Başlangıç
