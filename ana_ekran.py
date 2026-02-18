@@ -18,16 +18,11 @@ TR_AYLAR = {
     "September": "Eylül", "October": "Ekim", "November": "Kasım", "December": "Aralık"
 }
 
-# --- İZİN TÜRLERİ (Buraya istediğinizi ekleyebilirsiniz) ---
+# --- İZİN TÜRLERİ LİSTESİ ---
 IZIN_LISTESI = [
-    "Yıllık İzin", 
-    "Mazeret İzni", 
-    "Sağlık Raporu", 
-    "Saatlik İzin", 
-    "Ücretsiz İzin",
-    "Evlilik İzni",
-    "Vefat İzni",
-    "Babalık İzni"
+    "Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", 
+    "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", 
+    "Vefat İzni", "Babalık İzni"
 ]
 
 def verileri_yukle():
@@ -71,7 +66,7 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("personel_izin_formu_v_yeni"):
+    with st.form("personel_formu_v_son"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
@@ -90,38 +85,4 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
                 bit_str = donus.strftime('%d/%m/%Y')
         
         onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
-        submit = st.form_submit_button("TALEBİ GÖNDER")
-        
-        if submit:
-            if ad and tc and onay:
-                p_data = {
-                    "tarih": datetime.now().strftime("%d/%m/%Y"),
-                    "tc": str(tc), "ad": ad, "brans": "Personel",
-                    "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str
-                }
-                requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
-                st.success(f"Talebiniz ({tur}) başarıyla iletildi.")
-                st.balloons()
-            else:
-                st.warning("Lütfen alanları doldurup onaylayın.")
-
-else:
-    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
-    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
-    
-    if sifre == "1234":
-        df = verileri_yukle()
-        if not df.empty:
-            tab1, tab2 = st.tabs(["📊 Aylık Personel Karnesi", "📝 Manuel İzin Girişi"])
-            
-            with tab1:
-                aylar = sorted(df['Ay_Ismi'].dropna().unique())
-                if aylar:
-                    sec_ay = st.selectbox("Ay Seçin", aylar)
-                    ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
-                    
-                    ay_df['Günlük'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" not in str(x['Tür']) else 0, axis=1)
-                    ay_df['Saatlik'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" in str(x['Tür']) else 0, axis=1)
-                    
-                    # KARNE TABLOSU (Burada türleri de görebilirsiniz)
-                    ozet
+        submit = st.form_submit_button
