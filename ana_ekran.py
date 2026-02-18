@@ -9,10 +9,10 @@ URL = "https://script.google.com/macros/s/AKfycbyz1FkOaVRpkSAQoJrhaZcXsu_qQuYN-Y
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
 
-st.set_page_config(page_title="Izin Takip", layout="wide")
+st.set_page_config(page_title="Izin", layout="wide")
 
 TR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
-IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim"]
+IZ = ["Yıllık İzin", "Mazeret", "Sağlık", "Saatlik", "Ücretsiz", "Evlilik", "Vefat", "Babalık", "Eğitim"]
 
 def yukle():
     try:
@@ -23,7 +23,8 @@ def yukle():
             try:
                 f = "%d/%m/%Y %H:%M" if "Saatlik" in str(r['Tür']) else "%d/%m/%Y"
                 b, d = datetime.strptime(str(r['Başlangıç']), f), datetime.strptime(str(r['Dönüş']), f)
-                return (0, round((d-b).seconds/3600,1)) if "Saatlik" in str(r['Tür']) else ((d-b).days, 0)
+                if "Saatlik" in str(r['Tür']): return 0, round((d-b).seconds/3600,1)
+                return (d-b).days, 0
             except: return 0, 0
         df[['G', 'S']] = df.apply(lambda r: pd.Series(h(r)), axis=1)
         df['Ay'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True).dt.strftime('%B').map(TR)
@@ -44,11 +45,11 @@ if m == "⬇️ PERSONEL":
             s1, s2 = st.time_input("Çıkış"), st.time_input("Dönüş")
             b, d = f"{t2.strftime('%d/%m/%Y')} {s1.strftime('%H:%M')}", f"{t2.strftime('%d/%m/%Y')} {s2.strftime('%H:%M')}"
         else:
-            dn = st.date_input("İş Başı")
+            dn = st.date_input("Dönüş")
             b, d = t2.strftime('%d/%m/%Y'), dn.strftime('%d/%m/%Y')
         if st.form_submit_button("GÖNDER") and ad:
             requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}))
-            st.success("Tamam!"); st.balloons()
+            st.success("İletildi!"); st.balloons()
 
 else:
     st.title("🔐 YÖNETİCİ")
@@ -56,27 +57,29 @@ else:
     if sifre == "1234":
         df = yukle()
         tab1, tab2, tab3 = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel"])
-        
         with tab1:
-            st.subheader("Aylık Özet")
             if not df.empty:
-                aylar = sorted(df['Ay'].dropna().unique())
-                sa = st.selectbox("Ay Seç", aylar)
-                kn = df[df['Ay']==sa].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
+                ay = st.selectbox("Ay", sorted(df['Ay'].dropna().unique()))
+                kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
                 st.table(kn)
-            else: st.warning("Veri yok")
-
         with tab2:
-            st.subheader("Sicil Geçmişi")
             if not df.empty:
-                kişi = st.selectbox("Kişi Seç", sorted(df['Ad Soyad'].unique()))
-                filtre = df[df['Ad Soyad']==kişi]
-                st.metric("Toplam Gün", int(filtre['G'].sum()))
-                st.dataframe(filtre[['Başlangıç','Dönüş','Tür','G','S']])
-
+                kisi = st.selectbox("Kişi", sorted(df['Ad Soyad'].unique()))
+                f = df[df['Ad Soyad']==kisi]
+                st.metric("Toplam Gün", int(f['G'].sum()))
+                st.dataframe(f[['Başlangıç','Dönüş','Tür','G','S']])
         with tab3:
-            st.subheader("Manuel Kayıt")
-            mad = st.text_input("Personel İsmi")
-            mtp = st.radio("İzin Tipi", ["Tam Gün", "Saatlik"])
+            mad = st.text_input("İsim")
+            mtp = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"])
             with st.form("m"):
-                mtr = st.selectbox("
+                mtr = st.selectbox("İzin Nedeni", IZ)
+                mta = st.date_input("İzin Tarihi")
+                if mtp == "Saatlik":
+                    m1, m2 = st.time_input("Başla"), st.time_input("Bitir")
+                    mb, mi = f"{mta.strftime('%d/%m/%Y')} {m1.strftime('%H:%M')}", f"{mta.strftime('%d/%m/%Y')} {m2.strftime('%H:%M')}"
+                else:
+                    mdn = st.date_input("İş Başı")
+                    mb, mi = mta.strftime('%d/%m/%Y'), mdn.strftime('%d/%m/%Y')
+                if st.form_submit_button("KAYDET") and mad:
+                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":"0","ad":mad,"brans":"Y","tur":f"{mtr} ({mtp})","bas":mb,"bit":mi}))
+                    st.success("Eklendi!"); st.rerun()
