@@ -16,7 +16,6 @@ def verileri_yukle():
         df = pd.read_csv(SHEET_READ_URL)
         df.columns = [c.strip() for c in df.columns]
         
-        # Çalışma anında süre hesaplama (Sistemi bozmaz)
         def sure_hesapla(row):
             try:
                 if "Saatlik" in str(row['Tür']):
@@ -24,13 +23,13 @@ def verileri_yukle():
                     bas = datetime.strptime(row['Başlangıç'], fmt)
                     bit = datetime.strptime(row['Dönüş'], fmt)
                     fark = bit - bas
-                    return round(fark.seconds / 3600, 1) # Saat cinsinden sayı
+                    return round(fark.seconds / 3600, 1)
                 else:
                     fmt = "%d/%m/%Y"
                     bas = datetime.strptime(row['Başlangıç'], fmt)
                     bit = datetime.strptime(row['Dönüş'], fmt)
                     fark = (bit - bas).days
-                    return int(fark) # Gün cinsinden sayı
+                    return int(fark)
             except:
                 return 0
 
@@ -38,8 +37,7 @@ def verileri_yukle():
         df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay_Ismi'] = df['Tarih_Obj'].dt.strftime('%B %Y')
         return df
-    except Exception as e:
-        st.error(f"Veri yükleme hatası: {e}")
+    except:
         return pd.DataFrame()
 
 # --- MENÜ ---
@@ -62,4 +60,19 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
                 saat2 = s2.time_input("Dönüş")
                 bas, bit = f"{tar.strftime('%d/%m/%Y')} {saat1.strftime('%H:%M')}", f"{tar.strftime('%d/%m/%Y')} {saat2.strftime('%H:%M')}"
             else:
-                donus = st.date_input
+                donus = st.date_input("İş Başı Tarihi")
+                bas, bit = tar.strftime('%d/%m/%Y'), donus.strftime('%d/%m/%Y')
+        
+        onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
+        # Butonun form içinde olduğundan emin olduk:
+        personel_gonder = st.form_submit_button("TALEBİ GÖNDER")
+        
+        if personel_gonder:
+            if ad and tc and onay:
+                p = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur} ({tip})", "bas": bas, "bit": bit}
+                requests.post(APPS_SCRIPT_URL, data=json.dumps(p))
+                st.success("Talebiniz iletildi.")
+                st.balloons()
+
+else:
+    st.title("🔐 YÖNETİCİ KONTROL PANELİ
