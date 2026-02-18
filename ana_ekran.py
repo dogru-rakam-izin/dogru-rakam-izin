@@ -33,7 +33,7 @@ def yukle():
     except: return pd.DataFrame()
 
 def yazdir_html(bas, ic):
-    ht = f"<html><head><style>body{{font-family:'Times New Roman';padding:40px;line-height:1.6;}} .h{{text-align:center;font-weight:bold;margin-bottom:20px;border-bottom:2px solid #000;}} .c{{white-space:pre-wrap;text-align:justify;}} @media print{{.no{{display:none;}}}}</style></head><body onload='window.print()'><div class='h'>{bas}</div><div class='c'>{ic}</div></body></html>"
+    ht = f"<html><head><style>body{{font-family:'Times New Roman';padding:40px;line-height:1.6;}} .h{{text-align:center;font-weight:bold;margin-bottom:20px;border-bottom:2px solid #000;}} .c{{white-space:pre-wrap;}}</style></head><body onload='window.print()'><div class='h'>{bas}</div><div class='c'>{ic}</div></body></html>"
     st.components.v1.html(ht, height=0)
 
 m = st.sidebar.radio("MENÜ", ["⬇️ PERSONEL", "🔐 YÖNETİCİ"])
@@ -50,4 +50,44 @@ if m == "⬇️ PERSONEL":
             b, d = f"{t2.strftime('%d/%m/%Y')} {s1.strftime('%H:%M')}", f"{t2.strftime('%d/%m/%Y')} {s2.strftime('%H:%M')}"
         else:
             dn = st.date_input("İş Başı")
-            b, d = t
+            b, d = t2.strftime('%d/%m/%Y'), dn.strftime('%d/%m/%Y')
+        if st.form_submit_button("GÖNDER") and ad:
+            requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}))
+            st.success("İletildi!"); st.balloons()
+
+else:
+    st.title("🔐 YÖNETİCİ PANELİ")
+    sifre = st.sidebar.text_input("Şifre", type="password")
+    if sifre == "1234":
+        df = yukle()
+        tabs = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "📄 Formlar", "📅 Yıllık İzin Takip"])
+        
+        with tabs[0]: # KARNE
+            if not df.empty:
+                ay_secenek = df['Ay'].dropna().unique()
+                if len(ay_secenek) > 0:
+                    ay = st.selectbox("Ay", sorted(ay_secenek, reverse=True))
+                    kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().reset_index()
+                    st.table(kn.style.format({"G": "{:.1f}", "S": "{:.1f}"}))
+                else: st.warning("İşlenecek ay verisi bulunamadı.")
+            else: st.warning("Google Sheets verisi alınamadı veya dosya boş.")
+
+        with tabs[1]: # SİCİL
+            if not df.empty:
+                p_list = sorted(df['Ad Soyad'].unique())
+                p = st.selectbox("Personel Seç", p_list)
+                st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']])
+
+        with tabs[2]: # MANUEL
+            ma = st.text_input("Personel İsmi")
+            with st.form("m_form"):
+                tr, ta, dn = st.selectbox("İzin Türü", IZ), st.date_input("Başla Tarihi"), st.date_input("Dönüş Tarihi")
+                if st.form_submit_button("KAYDET") and ma:
+                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime("%d/%m/%Y"),"tc":"0","ad":ma,"brans":"Y","tur":tr,"bas":ta.strftime('%d/%m/%Y'),"bit":dn.strftime('%d/%m/%Y')}))
+                    st.success("Eklendi!"); st.rerun()
+
+        with tabs[3]: # FORMLAR
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                if st.button("📄 PERSONEL İZİN"):
+                    yazdir_html
