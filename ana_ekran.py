@@ -4,27 +4,38 @@ import requests
 import json
 from datetime import datetime
 
-# --- TASARIM, LOGO VE CSS ---
-st.set_page_config(page_title="Doğru Rakam İzin", layout="wide")
+# --- LOGO VE GÖRSEL AYARLAR ---
+# Buradaki linki kendi logonuzun internet adresiyle değiştirebilirsiniz
+LOGO_URL = "https://cdn-icons-png.flaticon.com/512/3532/3532803.png"
 
-# LOGO VE BAŞLIK ALANI
-col_logo, col_text = st.columns([1, 4])
+st.set_page_config(page_title="Doğru Rakam İzin", layout="wide", page_icon=LOGO_URL)
+
+# --- TASARIM (CSS) ---
+st.markdown(f"""
+    <style>
+    /* Silüeti kaldır ve logoyu yerleştir */
+    [data-testid="stSidebarNav"] {{
+        background-image: url({LOGO_URL});
+        background-repeat: no-repeat;
+        padding-top: 120px;
+        background-position: 20px 20px;
+        background-size: 100px auto;
+    }}
+    .main-title {{ color: #1E88E5; font-size: 40px; font-weight: bold; margin-bottom: 0px; }}
+    .sub-title {{ color: #555; font-size: 18px; margin-top: -10px; }}
+    div.stButton > button:first-child {{
+        background-color: #1E88E5; color: white; border-radius: 10px; font-weight: bold; width: 100%;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- LOGO VE BAŞLIK ALANI (ÜST KISIM) ---
+col_logo, col_text = st.columns([1, 5])
 with col_logo:
-    # BURAYA KENDİ LOGO LİNKİNİ YAPIŞTIRABİLİRSİN
-    st.image("https://cdn-icons-png.flaticon.com/512/3532/3532803.png", width=120) 
-
+    st.image(LOGO_URL, width=120)
 with col_text:
-    st.markdown("""
-        <style>
-        .main-title { color: #1E88E5; font-size: 40px; font-weight: bold; margin-bottom: 0px; }
-        .sub-title { color: #555; font-size: 18px; margin-top: -10px; }
-        div.stButton > button:first-child {
-            background-color: #1E88E5; color: white; border-radius: 10px; height: 3em; width: 100%; font-weight: bold;
-        }
-        </style>
-        <p class="main-title">DOĞRU RAKAM ÖZEL EĞİTİM</p>
-        <p class="sub-title">Personel İzin Takip Sistemi</p>
-        """, unsafe_allow_html=True)
+    st.markdown('<p class="main-title">DOĞRU RAKAM ÖZEL EĞİTİM</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Personel İzin Yönetim Sistemi</p>', unsafe_allow_html=True)
 
 # --- AYARLAR VE FORMATLAR ---
 F_TARIH, F_SAAT, F_TAM = '%d/%m/%Y', '%H:%M', '%d/%m/%Y %H:%M'
@@ -72,7 +83,7 @@ if "PERSONEL" in m:
     tc = tc_c.text_input("TC Kimlik No", max_chars=11)
     tp = st.radio("İzin Süresi", TP_LIST, horizontal=True)
     
-    with st.expander("📝 İzin Formu", expanded=True):
+    with st.expander("📝 İzin Başvuru Formu", expanded=True):
         with st.form("p"):
             t1 = st.selectbox("İzin Türü", IZ)
             t2 = st.date_input("Başlangıç Tarihi")
@@ -103,14 +114,14 @@ else:
                     ay = st.selectbox("Dönem", ays)
                     st.dataframe(df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().style.format("{:.1f}"), use_container_width=True)
             with t[1]:
-                p = st.selectbox("Personel", sorted(df['Ad Soyad'].unique()))
+                p = st.selectbox("Personel Seç", sorted(df['Ad Soyad'].unique()))
                 st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
             with t[2]:
                 with st.form("m"):
-                    m_ad = st.text_input("İsim")
+                    m_ad = st.text_input("Personel İsmi")
                     m_tp = st.radio("Tip", TP_LIST, horizontal=True)
                     tr, ta = st.selectbox("Tür ", IZ), st.date_input("Tarih ")
-                    if st.form_submit_button("EKLE") and m_ad:
+                    if st.form_submit_button("KAYDI EKLE") and m_ad:
                         now = datetime.now().strftime(F_TARIH)
                         p_m = {"tarih":now,"tc":"0","ad":m_ad,"brans":"Y","tur":f"{tr} ({m_tp})","bas":ta.strftime(F_TARIH),"bit":ta.strftime(F_TARIH)}
                         requests.post(URL, data=json.dumps(p_m))
@@ -123,8 +134,8 @@ else:
                 df_yil = df[(df['Ad Soyad']==py) & (df['Tür'].str.contains("Yıllık", na=False))]
                 ku = df_yil['G'].sum()
                 c1, c2, c3 = st.columns(3)
-                c1.metric("Hak", f"{hk} G")
+                c1.metric("Toplam Hak", f"{hk} G")
                 c2.metric("Kullanılan", f"{ku:.1f} G", delta=f"-{ku}", delta_color="inverse")
-                c3.metric("Kalan", f"{hk-ku:.1f} G", delta=f"{hk-ku}")
+                c3.metric("Kalan İzin", f"{hk-ku:.1f} G", delta=f"{hk-ku}")
                 st.dataframe(df_yil[['Başlangıç', 'Dönüş', 'G']], use_container_width=True)
-    else: st.info("Şifre gereklidir.")
+    else: st.info("Lütfen yönetici şifresini giriniz.")
