@@ -41,8 +41,7 @@ menu = st.sidebar.radio("MENÜ", ["PERSONEL", "YONETICI"])
 
 if menu == "PERSONEL":
     st.title("DOĞRU RAKAM İZİN")
-    ad = st.text_input("Ad Soyad")
-    tc = st.text_input("TC No")
+    ad, tc = st.text_input("Ad Soyad"), st.text_input("TC No")
     tp = st.radio("Tip", ["Tam Gün", "Saatlik"], horizontal=True)
     with st.form("p"):
         t1, t2 = st.selectbox("Tür", IZ), st.date_input("Tarih")
@@ -63,19 +62,15 @@ else:
     st.title("YÖNETİCİ PANELİ")
     if st.sidebar.text_input("Şifre", type="password") == "1234":
         df = yukle()
-        if df.empty:
-            st.warning("Veri yok.")
-        else:
+        if not df.empty:
             tabs = st.tabs(TABS)
             with tabs[0]:
                 ays = sorted(df['Ay'].dropna().unique(), reverse=True)
                 if ays:
                     ay = st.selectbox("Ay Seç", ays)
-                    kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum()
-                    st.table(kn)
+                    st.table(df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum())
             with tabs[1]:
-                ps = sorted(df['Ad Soyad'].unique())
-                p = st.selectbox("Kişi Seç", ps)
+                p = st.selectbox("Kişi Seç", sorted(df['Ad Soyad'].unique()))
                 st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']])
             with tabs[2]:
                 m_ad = st.text_input("İsim")
@@ -95,20 +90,16 @@ else:
                         requests.post(URL, data=json.dumps(p_m))
                         st.success("Kaydedildi!"); st.rerun()
             with tabs[3]:
-                st.subheader("Yıllık İzin Takibi")
+                st.subheader("İzin Takibi")
                 py = st.selectbox("Personel", sorted(df['Ad Soyad'].unique()), key="py")
-                gt = st.date_input("İşe Giriş", value=datetime(2023, 1, 1))
+                gt = st.date_input("Giriş", value=datetime(2023, 1, 1))
                 kd = (2026 - gt.year)
                 hk = 14 if kd < 5 else 20 if kd < 15 else 26
                 if kd < 1: hk = 0
-                
-                yil_filtre = (df['Ad Soyad'] == py) & (df['Tür'].str.contains("Yıllık", na=False))
-                df_yil = df[yil_filtre].copy()
+                df_yil = df[(df['Ad Soyad']==py) & (df['Tür'].str.contains("Yıllık", na=False))]
                 ku = df_yil['G'].sum()
-                
                 c1, c2, c3 = st.columns(3)
-                c1.metric("Toplam Hak", f"{hk} Gün")
-                c2.metric("Kullanılan", f"{ku:.1f} Gün")
-                c3.metric("Kalan", f"{hk-ku:.1f} Gün")
-                
-                if not
+                c1.metric("Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku:.1f} G"); c3.metric("Kalan", f"{hk-ku:.1f} G")
+                if not df_yil.empty: st.dataframe(df_yil[['Başlangıç', 'Dönüş', 'G']])
+        else: st.warning("Veri yok.")
+    else: st.info("Şifre giriniz.")
