@@ -13,7 +13,6 @@ st.set_page_config(page_title="Doğru Rakam İzin", layout="wide")
 
 TR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
 IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim"]
-TABS = ["Karne", "Sicil", "Manuel", "Yıllık İzin Takibi"]
 
 def yukle():
     try:
@@ -31,15 +30,15 @@ def yukle():
                 return (d-b).days, 0
             except: return 0, 0
         res = df.apply(lambda r: pd.Series(h(r)), axis=1)
-        df['G'], df['S'] = res[0], res[1]
+        df['G'], df['S'] = res[0].astype(float), res[1].astype(float)
         df['T'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay'] = df['T'].dt.strftime('%B').map(TR) + " " + df['T'].dt.strftime('%Y')
         return df
     except: return pd.DataFrame()
 
-menu = st.sidebar.radio("MENÜ", ["PERSONEL", "YONETICI"])
+m = st.sidebar.radio("MENÜ", ["PERSONEL", "YONETICI"])
 
-if menu == "PERSONEL":
+if m == "PERSONEL":
     st.title("DOĞRU RAKAM İZİN")
     ad, tc = st.text_input("Ad Soyad"), st.text_input("TC No")
     tp = st.radio("Tip", ["Tam Gün", "Saatlik"], horizontal=True)
@@ -56,50 +55,23 @@ if menu == "PERSONEL":
             now = datetime.now().strftime("%d/%m/%Y")
             pay = {"tarih":now,"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}
             requests.post(URL, data=json.dumps(pay))
-            st.success("Gönderildi!")
+            st.success("İletildi!")
 
 else:
     st.title("YÖNETİCİ PANELİ")
     if st.sidebar.text_input("Şifre", type="password") == "1234":
         df = yukle()
         if not df.empty:
-            tabs = st.tabs(TABS)
-            with tabs[0]:
+            t = st.tabs(["Karne", "Sicil", "Manuel", "Yıllık İzin"])
+            with t[0]:
                 ays = sorted(df['Ay'].dropna().unique(), reverse=True)
                 if ays:
                     ay = st.selectbox("Ay Seç", ays)
-                    st.table(df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum())
-            with tabs[1]:
-                p = st.selectbox("Kişi Seç", sorted(df['Ad Soyad'].unique()))
+                    kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum()
+                    st.table(kn.style.format("{:.1f}"))
+            with t[1]:
+                p = st.selectbox("Kişi", sorted(df['Ad Soyad'].unique()))
                 st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']])
-            with tabs[2]:
+            with t[2]:
                 m_ad = st.text_input("İsim")
-                m_tp = st.radio("Tip", ["Tam Gün", "Saatlik"], key="mt")
-                with st.form("m"):
-                    tr, ta = st.selectbox("Tür", IZ), st.date_input("Tarih")
-                    t_f = ta.strftime('%d/%m/%Y')
-                    if m_tp == "Saatlik":
-                        ms1, ms2 = st.time_input("C1"), st.time_input("C2")
-                        mb, md = f"{t_f} {ms1.strftime('%H:%M')}", f"{t_f} {ms2.strftime('%H:%M')}"
-                    else:
-                        m_don = st.date_input("Dönüş")
-                        mb, md = t_f, m_don.strftime('%d/%m/%Y')
-                    if st.form_submit_button("KAYDET") and m_ad:
-                        now = datetime.now().strftime("%d/%m/%Y")
-                        p_m = {"tarih":now,"tc":"0","ad":m_ad,"brans":"Y","tur":f"{tr} ({m_tp})","bas":mb,"bit":md}
-                        requests.post(URL, data=json.dumps(p_m))
-                        st.success("Kaydedildi!"); st.rerun()
-            with tabs[3]:
-                st.subheader("İzin Takibi")
-                py = st.selectbox("Personel", sorted(df['Ad Soyad'].unique()), key="py")
-                gt = st.date_input("Giriş", value=datetime(2023, 1, 1))
-                kd = (2026 - gt.year)
-                hk = 14 if kd < 5 else 20 if kd < 15 else 26
-                if kd < 1: hk = 0
-                df_yil = df[(df['Ad Soyad']==py) & (df['Tür'].str.contains("Yıllık", na=False))]
-                ku = df_yil['G'].sum()
-                c1, c2, c3 = st.columns(3)
-                c1.metric("Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku:.1f} G"); c3.metric("Kalan", f"{hk-ku:.1f} G")
-                if not df_yil.empty: st.dataframe(df_yil[['Başlangıç', 'Dönüş', 'G']])
-        else: st.warning("Veri yok.")
-    else: st.info("Şifre giriniz.")
+                m_tp = st.radio("Tip", ["Tam Gün", "Saatlik
