@@ -60,3 +60,38 @@ if m == "PERSONEL":
             requests.post(URL, data=json.dumps(d))
             st.success("Gonderildi")
 else:
+    st.title("YONETICI PANELI")
+    sifre = st.sidebar.text_input("Sifre", type="password")
+    if sifre == "1234":
+        df = yukle()
+        t = st.tabs(["Karne", "Sicil", "Manuel", "Formlar", "Yillik"])
+        with t[0]:
+            if not df.empty:
+                ays = sorted(df['Ay'].dropna().unique(), reverse=True)
+                ay = st.selectbox("Ay Sec", ays)
+                st.table(df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum())
+        with t[1]:
+            if not df.empty:
+                ps = sorted(df['Ad Soyad'].unique())
+                p = st.selectbox("Kisi", ps)
+                st.dataframe(df[df['Ad Soyad']==p])
+        with t[2]:
+            ma = st.text_input("Isim")
+            if st.button("KAYDET") and ma: st.success("Ok")
+        with t[3]:
+            c1, c2, c3 = st.columns(3)
+            if c1.button("IZIN FORMU"): yazdir("IZIN FORMU", F1)
+            if c2.button("UCRETSIZ"): yazdir("UCRETSIZ", F2)
+            if c3.button("YILLIK"): yazdir("YILLIK", F3)
+        with t[4]:
+            if not df.empty:
+                plist = sorted(df['Ad Soyad'].unique())
+                py = st.selectbox("Personel", plist)
+                gr = st.date_input("Giris")
+                kd = (datetime.now().year - gr.year)
+                hk = 14 if kd < 5 else 20 if kd < 15 else 26
+                mask = (df['Ad Soyad'] == py) & (df['Tür'].str.contains("Yıllık"))
+                ku = df[mask]['G'].sum()
+                st.metric("Kalan", f"{hk-ku} Gun")
+    else:
+        st.write("Lütfen geçerli şifreyi girin.")
