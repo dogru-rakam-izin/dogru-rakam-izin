@@ -7,7 +7,7 @@ from datetime import datetime
 # --- LOGO VE KURUMSAL AYARLAR ---
 # NOT: Eğer bu link çalışmazsa, GitHub'daki resme sağ tıklayıp "Open image in new tab" 
 # diyerek çıkan linki buraya yapıştırın.
-LOGO_URL = "https://ibb.co/hJSB89rT"
+LOGO_URL = "https://ibb.co/cSRtX5kP"
 
 st.set_page_config(page_title="Doğru Rakam İzin", layout="wide", page_icon="🚩")
 
@@ -142,5 +142,6 @@ else:
                 c3.metric("Kalan İzin", f"{hk-ku:.1f} Gün")
                 st.dataframe(df_yil[['Başlangıç', 'Dönüş', 'G']], use_container_width=True)
     else: st.info("Şifre giriniz.")
+
 
 
