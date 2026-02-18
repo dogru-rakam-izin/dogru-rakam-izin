@@ -80,4 +80,5 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
                 bit_str = f"{tar.strftime('%d/%m/%Y')} {saat2.strftime('%H:%M')}"
             else:
                 donus = st.date_input("İş Başı Tarihi")
-                bas_str = tar.strftime('%d
+                bas_str = tar.strftime('%d/%m/%Y')
+                bit_str = donus.strftime('%d/%
