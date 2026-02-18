@@ -66,7 +66,7 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("personel_form_v_final"):
+    with st.form("personel_formu_v_final"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
@@ -75,9 +75,4 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
             if tip == "Saatlik":
                 s1, s2 = st.columns(2)
                 saat1 = s1.time_input("Çıkış Saati")
-                saat2 = s2.time_input("Dönüş Saati")
-                bas_str = f"{tar.strftime('%d/%m/%Y')} {saat1.strftime('%H:%M')}"
-                bit_str = f"{tar.strftime('%d/%m/%Y')} {saat2.strftime('%H:%M')}"
-            else:
-                donus = st.date_input("İş Başı Tarihi")
-                bas_str = tar.strftime('%d/%m/%
+                saat2 = s2.time_input("
