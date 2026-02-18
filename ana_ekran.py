@@ -18,7 +18,7 @@ TR_AYLAR = {
     "September": "Eylül", "October": "Ekim", "November": "Kasım", "December": "Aralık"
 }
 
-# --- YENİ İZİN TÜRLERİ ---
+# --- İZİN TÜRLERİ ---
 IZIN_LISTESI = [
     "Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", 
     "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", 
@@ -56,7 +56,7 @@ def verileri_yukle():
     except:
         return pd.DataFrame()
 
-# --- ARAYÜZ ---
+# --- MENÜ ---
 menu = st.sidebar.radio("MENÜ SEÇİMİ", ["⬇️ PERSONEL İZİN TALEBİ", "🔐 YÖNETİCİ PANELİ"])
 
 if menu == "⬇️ PERSONEL İZİN TALEBİ":
@@ -65,7 +65,7 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("personel_izin_formu_v_son"):
+    with st.form("personel_formu"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
@@ -91,7 +91,7 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
                     "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str
                 }
                 requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
-                st.success("Talebiniz başarıyla iletildi.")
+                st.success("Talebiniz iletildi!")
                 st.balloons()
             else:
                 st.warning("Lütfen tüm alanları doldurun.")
@@ -103,3 +103,12 @@ else:
     if sifre == "1234":
         df = verileri_yukle()
         if not df.empty:
+            tab1, tab2 = st.tabs(["📊 Aylık Personel Karnesi", "📝 Manuel İzin Girişi"])
+            
+            with tab1:
+                aylar = sorted(df['Ay_Ismi'].dropna().unique(), reverse=True)
+                if aylar:
+                    sec_ay = st.selectbox("Ay Seçin", aylar)
+                    ay_df = df[df['Ay_Ismi'] == sec_ay].copy()
+                    
+                    # Karne hesaplama ve sayı formatlama (2.0 -> 2)
