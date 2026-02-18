@@ -28,8 +28,7 @@ IZIN_LISTESI = [
 def verileri_yukle():
     try:
         df = pd.read_csv(SHEET_READ_URL)
-        if df.empty:
-            return pd.DataFrame()
+        if df.empty: return pd.DataFrame()
         df.columns = [c.strip() for c in df.columns]
         
         def sure_hesapla(row):
@@ -51,22 +50,20 @@ def verileri_yukle():
 
         df['Sure_Deger'] = df.apply(sure_hesapla, axis=1)
         df['Tarih_Obj'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
-        df['Ay_Ing'] = df['Tarih_Obj'].dt.strftime('%B')
-        df['Yil'] = df['Tarih_Obj'].dt.strftime('%Y')
-        df['Ay_Ismi'] = df['Ay_Ing'].map(TR_AYLAR) + " " + df['Yil']
+        df['Ay_Ismi'] = df['Tarih_Obj'].dt.strftime('%B').map(TR_AYLAR) + " " + df['Tarih_Obj'].dt.strftime('%Y')
         return df
     except:
         return pd.DataFrame()
 
 menu = st.sidebar.radio("MENÜ SEÇİMİ", ["⬇️ PERSONEL İZİN TALEBİ", "🔐 YÖNETİCİ PANELİ"])
 
-if menu == "⬇️ PERSONEL İZİN TALEBİ":
+if menu == "⬇️ PERSONEL İZİR TALEBİ":
     st.title("🏢 DOĞRU RAKAM ÖZEL EĞİTİM")
     ad = st.text_input("Ad Soyad")
     tc = st.text_input("TC Kimlik No", max_chars=11)
     tip = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
-    with st.form("personel_formu_v_final"):
+    with st.form("personel_izin_formu"):
         f1, f2 = st.columns(2)
         with f1:
             tur = st.selectbox("İzin Türü", IZIN_LISTESI)
@@ -75,4 +72,25 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
             if tip == "Saatlik":
                 s1, s2 = st.columns(2)
                 saat1 = s1.time_input("Çıkış Saati")
-                saat2 = s2.time_input("
+                saat2 = s2.time_input("Dönüş Saati")
+                bas_str = f"{tar.strftime('%d/%m/%Y')} {saat1.strftime('%H:%M')}"
+                bit_str = f"{tar.strftime('%d/%m/%Y')} {saat2.strftime('%H:%M')}"
+            else:
+                donus = st.date_input("İş Başı Tarihi")
+                bas_str = tar.strftime('%d/%m/%Y')
+                bit_str = donus.strftime('%d/%m/%Y')
+        
+        onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
+        if st.form_submit_button("TALEBİ GÖNDER"):
+            if ad and tc and onay:
+                p_data = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur} ({tip})", "bas": bas_str, "bit": bit_str}
+                requests.post(APPS_SCRIPT_URL, data=json.dumps(p_data))
+                st.success("Talebiniz başarıyla iletildi.")
+                st.balloons()
+            else:
+                st.warning("Lütfen tüm alanları doldurun.")
+
+else:
+    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
+    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
+    if sifre == "1234":
