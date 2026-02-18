@@ -4,32 +4,30 @@ import requests
 import json
 from datetime import datetime
 
-# --- TASARIM VE RENKLENDİRME (CSS) ---
+# --- TASARIM, LOGO VE CSS ---
 st.set_page_config(page_title="Doğru Rakam İzin", layout="wide")
 
-st.markdown("""
-    <style>
-    /* Ana Başlık Rengi */
-    .main-title { color: #1E88E5; font-size: 36px; font-weight: bold; text-align: center; margin-bottom: 20px; }
-    
-    /* Butonları Renklendirme */
-    div.stButton > button:first-child {
-        background-color: #1E88E5; color: white; border-radius: 10px; border: none; height: 3em; width: 100%; font-weight: bold;
-    }
-    div.stButton > button:hover { background-color: #1565C0; color: white; border: none; }
-    
-    /* Yan Menü Tasarımı */
-    [data-testid="stSidebar"] { background-color: #F8F9FA; border-right: 1px solid #E0E0E0; }
-    
-    /* Tablo ve Veri Çerçeveleri */
-    .stTable { border: 1px solid #E0E0E0; border-radius: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
+# LOGO VE BAŞLIK ALANI
+col_logo, col_text = st.columns([1, 4])
+with col_logo:
+    # BURAYA KENDİ LOGO LİNKİNİ YAPIŞTIRABİLİRSİN
+    st.image("https://cdn-icons-png.flaticon.com/512/3532/3532803.png", width=120) 
+
+with col_text:
+    st.markdown("""
+        <style>
+        .main-title { color: #1E88E5; font-size: 40px; font-weight: bold; margin-bottom: 0px; }
+        .sub-title { color: #555; font-size: 18px; margin-top: -10px; }
+        div.stButton > button:first-child {
+            background-color: #1E88E5; color: white; border-radius: 10px; height: 3em; width: 100%; font-weight: bold;
+        }
+        </style>
+        <p class="main-title">DOĞRU RAKAM ÖZEL EĞİTİM</p>
+        <p class="sub-title">Personel İzin Takip Sistemi</p>
+        """, unsafe_allow_html=True)
 
 # --- AYARLAR VE FORMATLAR ---
-F_TARIH = '%d/%m/%Y'
-F_SAAT = '%H:%M'
-F_TAM = '%d/%m/%Y %H:%M'
+F_TARIH, F_SAAT, F_TAM = '%d/%m/%Y', '%H:%M', '%d/%m/%Y %H:%M'
 URL = "https://script.google.com/macros/s/AKfycbyz1FkOaVRpkSAQoJrhaZcXsu_qQuYN-Y18S-yQblLIUqGBlFgoryoNW4eLfw8d0DZ1/exec"
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
@@ -69,13 +67,12 @@ def yukle():
 m = st.sidebar.radio("📌 MENÜ SEÇİMİ", ["👤 PERSONEL GİRİŞİ", "🔐 YÖNETİCİ PANELİ"])
 
 if "PERSONEL" in m:
-    st.markdown('<p class="main-title">🏢 DOĞRU RAKAM ÖZEL EĞİTİM</p>', unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    ad = c1.text_input("Ad Soyad")
-    tc = c2.text_input("TC Kimlik No", max_chars=11)
+    ad_c, tc_c = st.columns(2)
+    ad = ad_c.text_input("Ad Soyad")
+    tc = tc_c.text_input("TC Kimlik No", max_chars=11)
     tp = st.radio("İzin Süresi", TP_LIST, horizontal=True)
     
-    with st.expander("📝 İzin Formunu Doldur", expanded=True):
+    with st.expander("📝 İzin Formu", expanded=True):
         with st.form("p"):
             t1 = st.selectbox("İzin Türü", IZ)
             t2 = st.date_input("Başlangıç Tarihi")
@@ -87,15 +84,14 @@ if "PERSONEL" in m:
                 dn = st.date_input("İş Başı Tarihi")
                 b, d = fmt, dn.strftime(F_TARIH)
             
-            if st.form_submit_button("TALEBİ GÖNDER") and ad:
+            if st.form_submit_button("BAŞVURUYU TAMAMLA") and ad:
                 now = datetime.now().strftime(F_TARIH)
                 pay = {"tarih":now,"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}
                 requests.post(URL, data=json.dumps(pay))
                 st.balloons()
-                st.success("Talebiniz başarıyla yönetime iletildi!")
+                st.success("Talebiniz başarıyla gönderildi!")
 
 else:
-    st.markdown('<p class="main-title">🔐 YÖNETİCİ KONTROL PANELİ</p>', unsafe_allow_html=True)
     sifre = st.sidebar.text_input("Şifre", type="password")
     if sifre == "1234":
         df = yukle()
@@ -104,40 +100,31 @@ else:
             with t[0]:
                 ays = sorted(df['Ay'].dropna().unique(), reverse=True)
                 if ays:
-                    ay = st.selectbox("Dönem Seçiniz", ays)
-                    kn = df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum()
-                    st.dataframe(kn.style.format("{:.1f}"), use_container_width=True)
+                    ay = st.selectbox("Dönem", ays)
+                    st.dataframe(df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().style.format("{:.1f}"), use_container_width=True)
             with t[1]:
                 p = st.selectbox("Personel", sorted(df['Ad Soyad'].unique()))
                 st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
             with t[2]:
                 with st.form("m"):
-                    m_ad = st.text_input("Personel İsmi")
+                    m_ad = st.text_input("İsim")
                     m_tp = st.radio("Tip", TP_LIST, horizontal=True)
-                    tr, ta = st.selectbox("Tür", IZ), st.date_input("Başlangıç")
-                    t_f = ta.strftime(F_TARIH)
-                    if m_tp == "Saatlik":
-                        ms1, ms2 = st.time_input("Ç1"), st.time_input("Ç2")
-                        mb, md = f"{t_f} {ms1.strftime(F_SAAT)}", f"{t_f} {ms2.strftime(F_SAAT)}"
-                    else:
-                        m_dn = st.date_input("Dönüş")
-                        mb, md = t_f, m_dn.strftime(F_TARIH)
-                    if st.form_submit_button("KAYDI TAMAMLA") and m_ad:
+                    tr, ta = st.selectbox("Tür ", IZ), st.date_input("Tarih ")
+                    if st.form_submit_button("EKLE") and m_ad:
                         now = datetime.now().strftime(F_TARIH)
-                        p_m = {"tarih":now,"tc":"0","ad":m_ad,"brans":"Y","tur":f"{tr} ({m_tp})","bas":mb,"bit":md}
+                        p_m = {"tarih":now,"tc":"0","ad":m_ad,"brans":"Y","tur":f"{tr} ({m_tp})","bas":ta.strftime(F_TARIH),"bit":ta.strftime(F_TARIH)}
                         requests.post(URL, data=json.dumps(p_m))
                         st.success("Kayıt Eklendi!"); st.rerun()
             with t[3]:
-                py = st.selectbox("Personel Seç", sorted(df['Ad Soyad'].unique()), key="py")
+                py = st.selectbox("Personel ", sorted(df['Ad Soyad'].unique()), key="py")
                 gt = st.date_input("İşe Giriş", value=datetime(2023, 1, 1))
                 kd = (2026 - gt.year)
                 hk = hakedis_bul(kd)
                 df_yil = df[(df['Ad Soyad']==py) & (df['Tür'].str.contains("Yıllık", na=False))]
                 ku = df_yil['G'].sum()
                 c1, c2, c3 = st.columns(3)
-                c1.metric("Toplam Hak", f"{hk} Gün")
-                c2.metric("Kullanılan", f"{ku:.1f} Gün", delta=f"-{ku}", delta_color="inverse")
-                c3.metric("Kalan İzin", f"{hk-ku:.1f} Gün", delta=f"{hk-ku}")
-                if not df_yil.empty: st.dataframe(df_yil[['Başlangıç', 'Dönüş', 'G']], use_container_width=True)
-        else: st.warning("Henüz veri yok.")
-    else: st.info("Lütfen sol menüden şifre giriniz.")
+                c1.metric("Hak", f"{hk} G")
+                c2.metric("Kullanılan", f"{ku:.1f} G", delta=f"-{ku}", delta_color="inverse")
+                c3.metric("Kalan", f"{hk-ku:.1f} G", delta=f"{hk-ku}")
+                st.dataframe(df_yil[['Başlangıç', 'Dönüş', 'G']], use_container_width=True)
+    else: st.info("Şifre gereklidir.")
