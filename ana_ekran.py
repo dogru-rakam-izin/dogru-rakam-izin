@@ -75,4 +75,28 @@ if menu == "⬇️ PERSONEL İZİN TALEBİ":
         onay = st.checkbox("Bilgilerin doğruluğunu onaylıyorum.")
         if st.form_submit_button("TALEBİ GÖNDER"):
             if ad and tc and onay:
-                p = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur
+                # HATALI SATIR BURADA DÜZELTİLDİ:
+                p = {"tarih": datetime.now().strftime("%d/%m/%Y"), "tc": str(tc), "ad": ad, "brans": "Personel", "tur": f"{tur} ({tip})", "bas": bas, "bit": bit}
+                requests.post(APPS_SCRIPT_URL, data=json.dumps(p))
+                st.success("Talebiniz iletildi.")
+                st.balloons()
+
+else:
+    st.title("🔐 YÖNETİCİ KONTROL PANELİ")
+    sifre = st.sidebar.text_input("Giriş Şifresi", type="password")
+    
+    if sifre == "1234":
+        df = verileri_yukle()
+        if not df.empty:
+            tab1, tab2 = st.tabs(["📊 Aylık Personel Özeti", "📝 Manuel İzin Girişi"])
+            
+            with tab1:
+                aylar = sorted(df['Ay_Ismi'].dropna().unique())
+                if aylar:
+                    secilen_ay = st.selectbox("Analiz Edilecek Ayı Seçin", aylar)
+                    ay_df = df[df['Ay_Ismi'] == secilen_ay].copy()
+                    
+                    ay_df['Günlük'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" not in str(x['Tür']) else 0, axis=1)
+                    ay_df['Saatlik'] = ay_df.apply(lambda x: x['Sure_Deger'] if "Saatlik" in str(x['Tür']) else 0, axis=1)
+                    
+                    oz
