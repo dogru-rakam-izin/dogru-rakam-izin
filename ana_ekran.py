@@ -5,44 +5,40 @@ import json
 from datetime import datetime
 
 # --- LOGO VE KURUMSAL AYARLAR ---
-# Paylaştığınız yeni logoyu buraya tanımladım:
+# NOT: Eğer bu link çalışmazsa, GitHub'daki resme sağ tıklayıp "Open image in new tab" 
+# diyerek çıkan linki buraya yapıştırın.
 LOGO_URL = "https://raw.githubusercontent.com/fatih-oncu/dogru-rakam-izin/main/LOGO.jpg"
 
-st.set_page_config(page_title="Doğru Rakam İzin", layout="wide", page_icon=LOGO_URL)
+st.set_page_config(page_title="Doğru Rakam İzin", layout="wide", page_icon="🚩")
 
 # --- TASARIM (CSS) ---
 st.markdown(f"""
     <style>
-    /* Yan Menüde Logoyu Göster ve Silüeti Kaldır */
+    /* Yan menü tasarımı */
     [data-testid="stSidebarNav"] {{
-        background-image: url({LOGO_URL});
-        background-repeat: no-repeat;
-        padding-top: 140px;
-        background-position: center 20px;
-        background-size: 150px auto;
+        padding-top: 20px;
     }}
-    /* Başlık ve Font Ayarları */
-    .main-title {{ color: #CC0000; font-size: 42px; font-weight: bold; margin-bottom: 0px; font-family: 'Arial Black'; }}
+    .main-title {{ color: #CC0000; font-size: 42px; font-weight: bold; margin-bottom: 0px; }}
     .sub-title {{ color: #333; font-size: 18px; margin-top: -10px; font-weight: bold; }}
     
-    /* Butonları Kırmızı Yap (Logo ile Uyumlu) */
     div.stButton > button:first-child {{
         background-color: #CC0000; color: white; border-radius: 5px; font-weight: bold; width: 100%; border: none; height: 3.5em;
     }}
-    div.stButton > button:hover {{ background-color: #990000; color: white; }}
-    
-    /* Metrik Kartları Tasarımı */
-    [data-testid="stMetricValue"] {{ font-size: 28px; color: #CC0000; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- ANA SAYFA LOGO VE BAŞLIK ---
+# --- ANA SAYFA LOGO KONTROLÜ ---
 col_logo, col_text = st.columns([1, 4])
 with col_logo:
-    st.image(LOGO_URL, width=180)
+    try:
+        # Resim yüklenemezse hata vermemesi için hata yakalama ekledik
+        st.image(LOGO_URL, width=180)
+    except:
+        st.subheader("🚩 LOGO") # Resim bozuksa bu simge görünür
+
 with col_text:
     st.markdown('<p class="main-title">DOĞRU RAKAM ÖZEL EĞİTİM</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-title">Rehabilitasyon Merkezi Personel İzin Takip Sistemi</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Personel İzin Takip Sistemi</p>', unsafe_allow_html=True)
 
 # --- AYARLAR VE FORMATLAR ---
 F_TARIH, F_SAAT, F_TAM = '%d/%m/%Y', '%H:%M', '%d/%m/%Y %H:%M'
@@ -107,21 +103,21 @@ if "PERSONEL" in m:
                 pay = {"tarih":now,"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}
                 requests.post(URL, data=json.dumps(pay))
                 st.balloons()
-                st.success("Talebiniz başarıyla Doğru Rakam yönetimine iletildi!")
+                st.success("Talebiniz iletildi!")
 
 else:
     sifre = st.sidebar.text_input("Yönetici Şifresi", type="password")
     if sifre == "1234":
         df = yukle()
         if not df.empty:
-            t = st.tabs(["📊 Karne", "👤 Personel Sicil", "📝 Manuel Kayıt", "📅 Yıllık İzin Takibi"])
+            t = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "📅 Yıllık İzin"])
             with t[0]:
                 ays = sorted(df['Ay'].dropna().unique(), reverse=True)
                 if ays:
-                    ay = st.selectbox("Dönem Seçiniz", ays)
+                    ay = st.selectbox("Dönem", ays)
                     st.dataframe(df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum().style.format("{:.1f}"), use_container_width=True)
             with t[1]:
-                p = st.selectbox("Personel Listesi", sorted(df['Ad Soyad'].unique()))
+                p = st.selectbox("Personel", sorted(df['Ad Soyad'].unique()))
                 st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
             with t[2]:
                 with st.form("m"):
@@ -142,7 +138,7 @@ else:
                 ku = df_yil['G'].sum()
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Toplam Hak", f"{hk} Gün")
-                c2.metric("Kullanılan", f"{ku:.1f} Gün", delta=f"-{ku}", delta_color="inverse")
-                c3.metric("Kalan İzin", f"{hk-ku:.1f} Gün", delta=f"{hk-ku}")
+                c2.metric("Kullanılan", f"{ku:.1f} Gün")
+                c3.metric("Kalan İzin", f"{hk-ku:.1f} Gün")
                 st.dataframe(df_yil[['Başlangıç', 'Dönüş', 'G']], use_container_width=True)
-    else: st.info("Erişim için yönetici şifresini giriniz.")
+    else: st.info("Şifre giriniz.")
