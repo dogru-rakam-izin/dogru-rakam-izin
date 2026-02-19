@@ -10,7 +10,8 @@ st.set_page_config(page_title="Doğru Rakam İzin", layout="wide", page_icon=LOG
 
 # --- PERSONEL VERİTABANI ---
 PERSONEL_GIRISLERI = {
-    "ARİF EMRE YILDIZ": "2024-10-09", "AYŞE KOLBAŞ": "2022-03-04",
+    "ARİF EMRE YILDIZ": "2024-10-09","ARZU ÖZELMİŞ": "2024-10-09", 
+    "AYŞE KOLBAŞ": "2022-03-04",
     "AYŞE GÜLLÜ ÇIRAY": "2023-04-27", "BURAK ÖZAYDIN": "2025-09-11",
     "BUSE MEYRİLİ": "2025-02-07", "ERSİN KALSEN": "2023-06-06",
     "FERİDE CIKKAN": "2025-03-13", "GÖKÇE DÖNMEZKOL": "2025-06-24",
@@ -146,4 +147,5 @@ else:
             if not df.empty: st.dataframe(df.tail(20), use_container_width=True)
             st.link_button("🚀 Google Sheets Aç/Sil", f"https://docs.google.com/spreadsheets/d/{S_ID}/edit")
     else: st.warning("Şifre giriniz.")
+
 
