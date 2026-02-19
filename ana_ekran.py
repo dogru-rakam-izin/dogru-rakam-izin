@@ -37,19 +37,23 @@ def hakedis_bul(yil):
     return 26
 
 def yukle():
+    bos_df = pd.DataFrame()
     try:
         df = pd.read_csv(CSV)
-        if df.empty: return pd.DataFrame()
-        # Sütun isimlerini temizle
+        if df.empty: return bos_df, "Ad Soyad"
+        
         df.columns = [str(c).strip() for c in df.columns]
         
-        # Eğer "Ad Soyad" sütunu bulunamazsa, B sütunu olan 3. sütunu (indeks 2) kullanmaya çalış
-        col_name = "Ad Soyad"
-        if col_name not in df.columns:
-            if len(df.columns) > 2: col_name = df.columns[2]
-            else: return pd.DataFrame()
-
-        df[col_name] = df[col_name].astype(str).str.strip().str.upper()
+        # Sütun tespiti
+        ad_col = "Ad Soyad"
+        if ad_col not in df.columns:
+            # Eğer başlık farklıysa ilk 3 sütundan birini seçmeye çalış
+            for col in df.columns:
+                if "AD" in col.upper() or "SOYAD" in col.upper():
+                    ad_col = col
+                    break
+        
+        df[ad_col] = df[ad_col].astype(str).str.strip().str.upper()
         
         def h(r):
             try:
@@ -67,9 +71,9 @@ def yukle():
         df['G'], df['S'] = res[0].astype(float), res[1].astype(float)
         df['T'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay'] = df['T'].dt.strftime('%B').map(TR) + " " + df['T'].dt.strftime('%Y')
-        return df, col_name
+        return df, ad_col
     except:
-        return pd.DataFrame(), "Ad Soyad"
+        return bos_df, "Ad Soyad"
 
 # --- TASARIM ---
 st.markdown(f"<style>[data-testid='stSidebarNav'] {{ background-image: url({LOGO_URL}); background-repeat: no-repeat; padding-top: 140px; background-position: center 20px; background-size: 150px auto; }} .main-title {{ color: #CC0000; font-size: 38px; font-weight: bold; }} div.stButton > button {{ background-color: #CC0000; color: white; border-radius: 8px; font-weight: bold; width: 100%; }} [data-testid='stMetricValue'] {{ color: #CC0000; font-weight: bold; }}</style>", unsafe_allow_html=True)
@@ -97,24 +101,22 @@ else:
     if st.sidebar.text_input("Şifre", type="password") == "1234":
         df, ad_sutunu = yukle()
         t = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "📅 Yıllık İzin", "🗑️ Liste"])
-        
-        # Her zaman personel listemizi baz alıyoruz (Hata önleyici)
         p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
 
         with t[0]: # Karne
-            if not df.empty:
+            if not df.empty and 'Ay' in df.columns:
                 ay_list = sorted(df['Ay'].dropna().unique(), reverse=True)
                 if ay_list:
                     ay = st.selectbox("Ay Seç", ay_list)
                     st.dataframe(df[df['Ay']==ay].groupby([ad_sutunu,'Tür'])[['G','S']].sum(), use_container_width=True)
-            else: st.info("Henüz kayıtlı veri yok.")
+            else: st.info("Henüz analiz edilecek veri yok.")
 
         with t[1]: # Sicil
             p = st.selectbox("Personel", p_listesi)
             if not df.empty:
                 st.dataframe(df[df[ad_sutunu]==p][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
 
-        with t[2]: # Manuel Giriş
+        with t[2]: # Manuel
             with st.form("m_f"):
                 m_ad = st.selectbox("Personel", p_listesi)
                 m_tp = st.selectbox("Tip", ["Tam Gün", "Saatlik"])
@@ -134,7 +136,9 @@ else:
             kidem = datetime.now().year - gt.year
             if (datetime.now().month, datetime.now().day) < (gt.month, gt.day): kidem -= 1
             hk = hakedis_bul(max(0, kidem))
-            ku = df[(df[ad_sutunu]==py) & (df['Tür'].str.contains("Yıllık"))]['G'].sum() if not df.empty else 0
+            ku = 0
+            if not df.empty and 'Tür' in df.columns:
+                ku = df[(df[ad_sutunu]==py) & (df['Tür'].str.contains("Yıllık"))]['G'].sum()
             c1, c2, c3 = st.columns(3)
             c1.metric("Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
 
