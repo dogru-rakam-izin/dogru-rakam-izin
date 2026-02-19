@@ -8,7 +8,7 @@ from datetime import datetime
 LOGO_URL = "https://i.ibb.co/8LG243NJ/LOGO.png"
 st.set_page_config(page_title="Doğru Rakam İzin", layout="wide", page_icon=LOGO_URL)
 
-# --- İŞE GİRİŞ TARİHLERİ (Örnek veritabanı) ---
+# --- İŞE GİRİŞ TARİHLERİ (İstediğiniz personeli buraya ekleyebilirsiniz) ---
 GIRIS_TARIHLERI = {
     "Örnek Personel": "2022-05-15"
 }
@@ -43,7 +43,6 @@ def yukle():
         df = pd.read_csv(CSV)
         if df.empty: return pd.DataFrame()
         df.columns = [c.strip() for c in df.columns]
-        # Saatlik/Günlük ayrımı ve hesaplama
         def h(r):
             try:
                 ts = str(r['Tür'])
@@ -69,4 +68,61 @@ m = st.sidebar.radio("📌 MENÜ SEÇİMİ", ["👤 PERSONEL GİRİŞİ", "🔐 
 
 if "PERSONEL" in m:
     st.markdown('<p class="main-title">DOĞRU RAKAM ÖZEL EĞİTİM</p>', unsafe_allow_html=True)
-    c
+    col1, col2 = st.columns(2)
+    ad = col1.text_input("Ad Soyad")
+    tc = col2.text_input("TC No", max_chars=11)
+    tp = st.radio("İzin Süresi Tipi", ["Tam Gün", "Saatlik"], horizontal=True)
+    with st.expander("📝 İzin Başvuru Formu", expanded=True):
+        with st.form("p_f"):
+            t1 = st.selectbox("İzin Türü", IZ)
+            t2 = st.date_input("İzin Günü")
+            if tp == "Saatlik":
+                s1, s2 = st.time_input("Çıkış Saati"), st.time_input("Dönüş Saati")
+                b, d = f"{t2.strftime(F_TARIH)} {s1.strftime(F_SAAT)}", f"{t2.strftime(F_TARIH)} {s2.strftime(F_SAAT)}"
+            else:
+                dn = st.date_input("İş Başı Tarihi")
+                b, d = t2.strftime(F_TARIH), dn.strftime(F_TARIH)
+            if st.form_submit_button("BAŞVURUYU GÖNDER") and ad:
+                requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}))
+                st.balloons(); st.success("Talebiniz başarıyla iletildi!")
+else:
+    if st.sidebar.text_input("Şifre", type="password") == "1234":
+        df = yukle()
+        if not df.empty:
+            t = st.tabs(["📊 Karne", "👤 Personel Sicil Kaydı", "📝 Manuel Giriş", "📅 Yıllık İzin", "📑 Veri Listesi"])
+            with t[0]:
+                ays = sorted(df['Ay'].dropna().unique(), reverse=True)
+                if ays:
+                    ay = st.selectbox("Dönem Seçiniz", ays)
+                    st.dataframe(df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum(), use_container_width=True)
+            with t[1]:
+                p_list = sorted(df['Ad Soyad'].unique())
+                p = st.selectbox("Personel", p_list)
+                st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
+            with t[2]:
+                with st.form("m_f"):
+                    m_ad = st.text_input("İsim Soyad")
+                    m_tp = st.radio("Tip", ["Tam Gün", "Saatlik"], horizontal=True)
+                    m_tr = st.selectbox("Tür", IZ)
+                    m_tarih = st.date_input("Başlangıç Günü")
+                    if m_tp == "Saatlik":
+                        ms1, ms2 = st.time_input("Çıkış Saati"), st.time_input("Dönüş Saati")
+                        mb, md = f"{m_tarih.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}", f"{m_tarih.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}"
+                    else:
+                        m_d = st.date_input("Dönüş/İş Başı Tarihi")
+                        mb, md = m_tarih.strftime(F_TARIH), m_d.strftime(F_TARIH)
+                    if st.form_submit_button("SİSTEME KAYDET") and m_ad:
+                        requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":m_ad,"brans":"Y","tur":f"{m_tr} ({m_tp})","bas":mb,"bit":md}))
+                        st.success("Kayıt başarıyla eklendi!"); st.rerun()
+            with t[3]:
+                py = st.selectbox("Personel Seç", sorted(df['Ad Soyad'].unique()), key="py")
+                varsay_giris = datetime.strptime(GIRIS_TARIHLERI.get(py, "2024-01-01"), "%Y-%m-%d")
+                gt = st.date_input("İşe Giriş Tarihi", value=varsay_giris)
+                kd = (datetime.now().year - gt.year); hk = hakedis_bul(kd)
+                ku = df[(df['Ad Soyad']==py) & (df['Tür'].str.contains("Yıllık"))]['G'].sum()
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Toplam Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
+            with t[4]:
+                st.write("Son Girilen Kayıtlar")
+                st.dataframe(df[['Ad Soyad','Tür','Başlangıç','Dönüş']].tail(20), use_container_width=True)
+    else: st.info("Erişim için yönetici şifresini giriniz.")
