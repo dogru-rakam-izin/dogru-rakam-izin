@@ -8,6 +8,28 @@ from datetime import datetime
 LOGO_URL = "https://i.ibb.co/8LG243NJ/LOGO.png"
 st.set_page_config(page_title="Doğru Rakam İzin", layout="wide", page_icon=LOGO_URL)
 
+# --- PERSONEL VERİTABANI (Görselden Aktarılan İşe Giriş Tarihleri) ---
+PERSONEL_GIRISLERI = {
+    "ARİF EMRE YILDIZ": "2024-10-09",
+    "AYŞE KOLBAŞ": "2022-03-04",
+    "AYŞE GÜLLÜ ÇIRAY": "2023-04-27",
+    "BURAK ÖZAYDIN": "2025-09-11",
+    "BUSE MEYRİLİ": "2025-02-07",
+    "ERSİN KALSEN": "2023-06-06",
+    "FERİDE CIKKAN": "2025-03-13",
+    "GÖKÇE DÖNMEZKOL": "2025-06-24",
+    "HİDAYET ARZU ER": "2025-02-07",
+    "HÜSEYİN KIZIL": "2025-11-18",
+    "İBRAHİM SOYLU": "2020-09-17",
+    "MERVE ANAYURT": "2025-03-11",
+    "MİZGİN BİDER": "2025-09-15",
+    "NEFİSE NUR HOŞGÖR": "2025-06-09",
+    "ÖZLEM KAPLAN": "2024-08-01",
+    "PINAR TANRIVERDİ": "1900-01-01", # Görselde tarih boştu, varsayılan atandı
+    "SAMET DEMİREL": "2024-02-27",
+    "SELEN ŞEN": "2025-11-03"
+}
+
 # --- TASARIM (CSS) ---
 st.markdown(f"""
     <style>
@@ -35,16 +57,13 @@ def hakedis_bul(yil):
 
 def yukle():
     try:
-        # CSV'yi oku ve sütunlardaki gizli boşlukları temizle
         df = pd.read_csv(CSV)
         if df.empty: return pd.DataFrame()
         df.columns = [c.strip() for c in df.columns]
-        
-        # İçerikteki isimlerin başındaki-sonundaki boşlukları temizle
         if 'Ad Soyad' in df.columns:
-            df['Ad Soyad'] = df['Ad Soyad'].astype(str).str.strip()
-            df = df[df['Ad Soyad'] != 'nan'] # Boş satırları at
-            
+            df['Ad Soyad'] = df['Ad Soyad'].astype(str).str.strip().str.upper()
+            df = df[df['Ad Soyad'] != 'NAN']
+        
         def h(r):
             try:
                 ts = str(r['Tür'])
@@ -62,16 +81,13 @@ def yukle():
         df['T'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay'] = df['T'].dt.strftime('%B').map(TR) + " " + df['T'].dt.strftime('%Y')
         return df
-    except Exception as e:
-        st.error(f"Veri yükleme hatası: {e}")
-        return pd.DataFrame()
+    except: return pd.DataFrame()
 
-# --- MENÜ ---
 m = st.sidebar.radio("📌 MENÜ SEÇİMİ", ["👤 PERSONEL GİRİŞİ", "🔐 YÖNETİCİ PANELİ"])
 
 if m == "👤 PERSONEL GİRİŞİ":
     st.markdown('<p class="main-title">DOĞRU RAKAM ÖZEL EĞİTİM</p>', unsafe_allow_html=True)
-    c1, c2 = st.columns(2); ad = c1.text_input("Ad Soyad"); tc = c2.text_input("TC No", max_chars=11)
+    c1, c2 = st.columns(2); ad = c1.text_input("Ad Soyad").upper(); tc = c2.text_input("TC No", max_chars=11)
     tp = st.radio("İzin Süresi Tipi", ["Tam Gün", "Saatlik"], horizontal=True)
     with st.expander("📝 İzin Başvuru Formu", expanded=True):
         with st.form("p_f"):
@@ -87,68 +103,53 @@ if m == "👤 PERSONEL GİRİŞİ":
                 st.balloons(); st.success("Talebiniz iletildi!")
 
 else:
-    sifre = st.sidebar.text_input("Yönetici Şifresi", type="password")
-    if sifre == "1234":
+    if st.sidebar.text_input("Yönetici Şifresi", type="password") == "1234":
         df = yukle()
-        if not df.empty:
-            t = st.tabs(["📊 Karne", "👤 Personel Sicil", "📝 Manuel Giriş", "📅 Yıllık İzin", "🗑️ Veri Listesi"])
-            
-            with t[0]:
+        t = st.tabs(["📊 Karne", "👤 Personel Sicil", "📝 Manuel Giriş", "📅 Yıllık İzin", "🗑️ Veri Listesi"])
+        
+        with t[0]:
+            if not df.empty:
                 ays = sorted(df['Ay'].dropna().unique(), reverse=True)
                 if ays:
                     ay = st.selectbox("Dönem Seçiniz", ays)
                     st.dataframe(df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum(), use_container_width=True)
-            
-            with t[1]:
-                # İsimlerin görünmesi için liste temizlendi
-                p_list = sorted(list(df['Ad Soyad'].unique()))
-                if p_list:
-                    p = st.selectbox("Personel Seç", p_list)
-                    st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
-                else:
-                    st.info("Sicil kaydı bulunamadı.")
-            
-            with t[2]:
-                with st.form("m_f_manual"):
-                    m_ad = st.text_input("Personel İsmi")
-                    m_tp = st.selectbox("İzin Tipi", ["Tam Gün", "Saatlik"])
-                    m_tr = st.selectbox("Tür", IZ)
-                    m_tarih = st.date_input("Başlangıç Tarihi")
-                    
-                    c_s1, c_s2 = st.columns(2)
-                    ms1 = c_s1.time_input("Çıkış Saati (Sadece Saatlik)")
-                    ms2 = c_s2.time_input("Dönüş Saati (Sadece Saatlik)")
-                    m_db = st.date_input("İş Başı Tarihi (Sadece Tam Gün)")
-                    
-                    if st.form_submit_button("VERİYİ KAYDET"):
-                        if m_ad:
-                            if m_tp == "Saatlik":
-                                mb, md = f"{m_tarih.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}", f"{m_tarih.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}"
-                            else:
-                                mb, md = m_tarih.strftime(F_TARIH), m_db.strftime(F_TARIH)
-                            
-                            payload = {"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":m_ad,"brans":"Y","tur":f"{m_tr} ({m_tp})","bas":mb,"bit":md}
-                            res = requests.post(URL, data=json.dumps(payload))
-                            if res.status_code == 200:
-                                st.success(f"{m_ad} için kayıt başarıyla eklendi!")
-                                st.rerun()
-                            else:
-                                st.error("Google Sheets'e yazılamadı. URL'yi veya yetkileri kontrol edin.")
-                        else:
-                            st.warning("Lütfen isim giriniz.")
+        
+        with t[1]:
+            # İsimleri hem tablodan hem de personel listemizden birleştirip gösteriyoruz
+            all_names = sorted(list(set(list(df['Ad Soyad'].unique()) + list(PERSONEL_GIRISLERI.keys()))))
+            p = st.selectbox("Personel Seç", [n for n in all_names if n != "NAN"])
+            if not df.empty:
+                st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
+        
+        with t[2]:
+            with st.form("m_f_man"):
+                m_ad = st.selectbox("Personel", sorted(list(PERSONEL_GIRISLERI.keys())))
+                m_tp = st.selectbox("İzin Tipi", ["Tam Gün", "Saatlik"])
+                m_tr = st.selectbox("Tür", IZ)
+                m_tarih = st.date_input("Başlangıç Günü")
+                c_s1, c_s2 = st.columns(2)
+                ms1 = c_s1.time_input("Çıkış Saati")
+                ms2 = c_s2.time_input("Dönüş Saati")
+                m_db = st.date_input("İş Başı Tarihi")
+                if st.form_submit_button("SİSTEME KAYDET"):
+                    mb, md = (f"{m_tarih.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}", f"{m_tarih.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}") if m_tp == "Saatlik" else (m_tarih.strftime(F_TARIH), m_db.strftime(F_TARIH))
+                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":m_ad,"brans":"Y","tur":f"{m_tr} ({m_tp})","bas":mb,"bit":md}))
+                    st.success("Kayıt eklendi!"); st.rerun()
 
-            with t[3]:
-                p_list_y = sorted(list(df['Ad Soyad'].unique()))
-                if p_list_y:
-                    py = st.selectbox("Personel Sorgula", p_list_y, key="py_yillik")
-                    gt = st.date_input("İşe Giriş", value=datetime(2024,1,1))
-                    kd = (datetime.now().year - gt.year); hk = hakedis_bul(kd)
-                    ku = df[(df['Ad Soyad']==py) & (df['Tür'].str.contains("Yıllık"))]['G'].sum()
-                    st.metric("Kalan Yıllık İzin", f"{hk-ku} Gün")
+        with t[3]:
+            py = st.selectbox("Hakediş Sorgula", sorted(list(PERSONEL_GIRISLERI.keys())), key="py_y")
+            varsay_t = datetime.strptime(PERSONEL_GIRISLERI.get(py, "2024-01-01"), "%Y-%m-%d")
+            gt = st.date_input("İşe Giriş Tarihi (Otomatik Gelir)", value=varsay_t)
+            bugun = datetime.now()
+            kidem = bugun.year - gt.year
+            if (bugun.month, bugun.day) < (gt.month, gt.day): kidem -= 1
+            hk = hakedis_bul(max(0, kidem))
+            ku = df[(df['Ad Soyad']==py) & (df['Tür'].str.contains("Yıllık"))]['G'].sum() if not df.empty else 0
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Toplam Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
+            st.info(f"ℹ️ {py} personeli şu an {max(0, kidem)}. kıdem yılında.")
 
-            with t[4]:
-                st.dataframe(df[['Ad Soyad','Tür','Başlangıç','Dönüş']].tail(20), use_container_width=True)
-                sheet_url = f"https://docs.google.com/spreadsheets/d/{S_ID}/edit"
-                st.link_button("🚀 Google Sheets'i Aç (Satır Silmek İçin)", sheet_url)
-
-    else: st.warning("Şifre hatalı veya girilmedi.")
+        with t[4]:
+            if not df.empty: st.dataframe(df[['Ad Soyad','Tür','Başlangıç','Dönüş']].tail(20), use_container_width=True)
+            st.link_button("🚀 Google Sheets'i Aç ve Satırı Sil", f"https://docs.google.com/spreadsheets/d/{S_ID}/edit")
+    else: st.warning("Panele erişmek için şifre giriniz.")
