@@ -20,7 +20,6 @@ st.markdown(f"""
 
 # --- AYARLAR ---
 F_TARIH, F_SAAT, F_TAM = '%d/%m/%Y', '%H:%M', '%d/%m/%Y %H:%M'
-# Google Apps Script Web App URL'nizi buraya tekrar kontrol ederek yapıştırın
 URL = "https://script.google.com/macros/s/AKfycbyz1FkOaVRpkSAQoJrhaZcXsu_qQuYN-Y18S-yQblLIUqGBlFgoryoNW4eLfw8d0DZ1/exec"
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
@@ -39,6 +38,8 @@ def yukle():
         df = pd.read_csv(CSV)
         if df.empty: return pd.DataFrame()
         df.columns = [c.strip() for c in df.columns]
+        # Hatalı/Boş Ad Soyad satırlarını temizle
+        df = df.dropna(subset=['Ad Soyad'])
         def h(r):
             try:
                 ts = str(r['Tür'])
@@ -91,7 +92,9 @@ else:
                     st.dataframe(df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum(), use_container_width=True)
             
             with t[1]:
-                p = st.selectbox("Personel", sorted(df['Ad Soyad'].unique()))
+                # HATA GİDERME: Boş değerleri süzüp sırala
+                p_list = sorted([x for x in df['Ad Soyad'].unique() if pd.notna(x)])
+                p = st.selectbox("Personel Seç", p_list)
                 st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
             
             with t[2]:
@@ -99,39 +102,36 @@ else:
                     m_ad = st.text_input("İsim Soyad")
                     m_tp = st.selectbox("İzin Tipi", ["Tam Gün", "Saatlik"])
                     m_tr = st.selectbox("Tür", IZ)
-                    m_tarih = st.date_input("Tarih")
+                    m_tarih = st.date_input("Başlangıç Tarihi")
                     
-                    # Saatlik seçilirse saat kutuları formun içinde görünür
                     c_saat1, c_saat2 = st.columns(2)
-                    ms1 = c_saat1.time_input("Çıkış Saati (Sadece Saatlik için)")
-                    ms2 = c_saat2.time_input("Dönüş Saati (Sadece Saatlik için)")
+                    ms1 = c_saat1.time_input("Çıkış Saati (Saatlik ise)")
+                    ms2 = c_saat2.time_input("Dönüş Saati (Saatlik ise)")
+                    m_db = st.date_input("İş Başı Tarihi (Tam Gün ise)")
                     
-                    m_db = st.date_input("İş Başı Tarihi (Sadece Tam Gün için)")
-                    
-                    if st.form_submit_button("KAYDI EKLE"):
+                    if st.form_submit_button("KAYDI SİSTEME EKLE"):
                         if m_tp == "Saatlik":
                             mb, md = f"{m_tarih.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}", f"{m_tarih.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}"
                         else:
                             mb, md = m_tarih.strftime(F_TARIH), m_db.strftime(F_TARIH)
                         requests.post(URL, data=json.dumps({"method":"post","tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":m_ad,"brans":"Y","tur":f"{m_tr} ({m_tp})","bas":mb,"bit":md}))
-                        st.success("Kayıt eklendi!"); st.rerun()
+                        st.success("Kayıt başarıyla eklendi!"); st.rerun()
 
             with t[3]:
-                py = st.selectbox("Personel Seç", sorted(df['Ad Soyad'].unique()), key="py")
-                gt = st.date_input("İşe Giriş", value=datetime(2024,1,1))
+                p_list_y = sorted([x for x in df['Ad Soyad'].unique() if pd.notna(x)])
+                py = st.selectbox("Personel Seç", p_list_y, key="py")
+                gt = st.date_input("İşe Giriş Tarihi", value=datetime(2024,1,1))
                 kd = (datetime.now().year - gt.year); hk = hakedis_bul(kd)
                 ku = df[(df['Ad Soyad']==py) & (df['Tür'].str.contains("Yıllık"))]['G'].sum()
-                st.metric("Kalan İzin", f"{hk-ku} Gün")
+                st.metric("Kalan Yıllık İzin", f"{hk-ku} Gün")
 
             with t[4]:
-                st.info("💡 Silmek istediğiniz satırın solundaki index numarasını kullanın.")
+                st.error("⚠️ İZİN SİLME İŞLEMİ")
+                st.write("Aşağıda son girilen kayıtlar listelenmiştir. Bir kaydı silmek için alttaki butona tıklayarak Google Sheets dosyasını açın ve hatalı satırı sağ tıklayıp silin.")
                 st.dataframe(df[['Ad Soyad','Tür','Başlangıç','Dönüş']].tail(20), use_container_width=True)
                 
-                with st.form("delete_form"):
-                    row_to_delete = st.number_input("Silinecek Satır No (Index)", min_value=0, step=1)
-                    if st.form_submit_button("KAYDI KALICI OLARAK SİL"):
-                        # Google Script'e silme isteği gönderir (Scriptinizde delete metodu tanımlı olmalıdır)
-                        # Şimdilik en güvenli yol tabloyu görüp Google Sheets'ten silmektir.
-                        st.error("Silme işlemi için Google Sheets dosyasını açıp ilgili satırı silmeniz güvenlik gereği daha sağlıklıdır.")
+                # Doğrudan Google Sheets linki (Kullanıcının erişimi varsa çalışır)
+                sheet_url = f"https://docs.google.com/spreadsheets/d/{S_ID}/edit"
+                st.link_button("🚀 Google Sheets'i Aç ve Satırı Sil", sheet_url)
 
-    else: st.warning("Panele erişmek için şifre giriniz.")
+    else: st.warning("Yönetici paneli için şifre giriniz.")
