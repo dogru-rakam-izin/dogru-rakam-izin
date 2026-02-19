@@ -98,7 +98,7 @@ if m == "👤 PERSONEL GİRİŞİ":
                 st.success("İletildi!")
 
 else:
-    if st.sidebar.text_input("Şifre", type="password") == "1234":
+    if st.sidebar.text_input("Şifre", type="password") == "2020":
         df, ad_sutunu = yukle()
         t = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "📅 Yıllık İzin", "🗑️ Liste"])
         p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
@@ -146,3 +146,4 @@ else:
             if not df.empty: st.dataframe(df.tail(20), use_container_width=True)
             st.link_button("🚀 Google Sheets Aç/Sil", f"https://docs.google.com/spreadsheets/d/{S_ID}/edit")
     else: st.warning("Şifre giriniz.")
+
