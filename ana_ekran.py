@@ -8,7 +8,7 @@ from datetime import datetime
 LOGO_URL = "https://i.ibb.co/8LG243NJ/LOGO.png"
 st.set_page_config(page_title="Doğru Rakam İzin", layout="wide", page_icon=LOGO_URL)
 
-# --- İŞE GİRİŞ TARİHLERİ (İstediğiniz personeli buraya ekleyebilirsiniz) ---
+# --- İŞE GİRİŞ TARİHLERİ ---
 GIRIS_TARIHLERI = {
     "Örnek Personel": "2022-05-15"
 }
@@ -46,15 +46,12 @@ def yukle():
         def h(r):
             try:
                 ts = str(r['Tür'])
-                b_str = str(r['Başlangıç'])
-                d_str = str(r['Dönüş'])
+                b_str, d_str = str(r['Başlangıç']), str(r['Dönüş'])
                 if "Saatlik" in ts:
-                    b = datetime.strptime(b_str, F_TAM)
-                    d = datetime.strptime(d_str, F_TAM)
+                    b, d = datetime.strptime(b_str, F_TAM), datetime.strptime(d_str, F_TAM)
                     return 0, round((d-b).total_seconds()/3600, 1)
                 else:
-                    b = datetime.strptime(b_str[:10], F_TARIH)
-                    d = datetime.strptime(d_str[:10], F_TARIH)
+                    b, d = datetime.strptime(b_str[:10], F_TARIH), datetime.strptime(d_str[:10], F_TARIH)
                     return (d-b).days, 0
             except: return 0, 0
         res = df.apply(lambda r: pd.Series(h(r)), axis=1)
@@ -68,14 +65,11 @@ m = st.sidebar.radio("📌 MENÜ SEÇİMİ", ["👤 PERSONEL GİRİŞİ", "🔐 
 
 if "PERSONEL" in m:
     st.markdown('<p class="main-title">DOĞRU RAKAM ÖZEL EĞİTİM</p>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    ad = col1.text_input("Ad Soyad")
-    tc = col2.text_input("TC No", max_chars=11)
+    c1, c2 = st.columns(2); ad = c1.text_input("Ad Soyad"); tc = c2.text_input("TC No", max_chars=11)
     tp = st.radio("İzin Süresi Tipi", ["Tam Gün", "Saatlik"], horizontal=True)
     with st.expander("📝 İzin Başvuru Formu", expanded=True):
         with st.form("p_f"):
-            t1 = st.selectbox("İzin Türü", IZ)
-            t2 = st.date_input("İzin Günü")
+            t1 = st.selectbox("İzin Türü", IZ); t2 = st.date_input("İzin Günü")
             if tp == "Saatlik":
                 s1, s2 = st.time_input("Çıkış Saati"), st.time_input("Dönüş Saati")
                 b, d = f"{t2.strftime(F_TARIH)} {s1.strftime(F_SAAT)}", f"{t2.strftime(F_TARIH)} {s2.strftime(F_SAAT)}"
@@ -84,7 +78,7 @@ if "PERSONEL" in m:
                 b, d = t2.strftime(F_TARIH), dn.strftime(F_TARIH)
             if st.form_submit_button("BAŞVURUYU GÖNDER") and ad:
                 requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}))
-                st.balloons(); st.success("Talebiniz başarıyla iletildi!")
+                st.balloons(); st.success("Talebiniz yönetime iletildi!")
 else:
     if st.sidebar.text_input("Şifre", type="password") == "1234":
         df = yukle()
@@ -96,33 +90,33 @@ else:
                     ay = st.selectbox("Dönem Seçiniz", ays)
                     st.dataframe(df[df['Ay']==ay].groupby(['Ad Soyad','Tür'])[['G','S']].sum(), use_container_width=True)
             with t[1]:
-                p_list = sorted(df['Ad Soyad'].unique())
-                p = st.selectbox("Personel", p_list)
+                p = st.selectbox("Personel", sorted(df['Ad Soyad'].unique()))
                 st.dataframe(df[df['Ad Soyad']==p][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
             with t[2]:
                 with st.form("m_f"):
                     m_ad = st.text_input("İsim Soyad")
-                    m_tp = st.radio("Tip", ["Tam Gün", "Saatlik"], horizontal=True)
+                    m_tp = st.radio("İzin Tipi", ["Tam Gün", "Saatlik"], horizontal=True)
                     m_tr = st.selectbox("Tür", IZ)
-                    m_tarih = st.date_input("Başlangıç Günü")
+                    m_tarih = st.date_input("Tarih")
+                    # DİKKAT: Buradaki mantık yönetici panelinde saat kutularını açar
                     if m_tp == "Saatlik":
-                        ms1, ms2 = st.time_input("Çıkış Saati"), st.time_input("Dönüş Saati")
+                        ms1 = st.time_input("Çıkış Saati", value=datetime.strptime("09:00", "%H:%M").time())
+                        ms2 = st.time_input("Dönüş Saati", value=datetime.strptime("10:00", "%H:%M").time())
                         mb, md = f"{m_tarih.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}", f"{m_tarih.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}"
                     else:
-                        m_d = st.date_input("Dönüş/İş Başı Tarihi")
-                        mb, md = m_tarih.strftime(F_TARIH), m_d.strftime(F_TARIH)
-                    if st.form_submit_button("SİSTEME KAYDET") and m_ad:
+                        m_db = st.date_input("İş Başı Tarihi")
+                        mb, md = m_tarih.strftime(F_TARIH), m_db.strftime(F_TARIH)
+                    
+                    if st.form_submit_button("KAYDI SİSTEME EKLE") and m_ad:
                         requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":m_ad,"brans":"Y","tur":f"{m_tr} ({m_tp})","bas":mb,"bit":md}))
-                        st.success("Kayıt başarıyla eklendi!"); st.rerun()
+                        st.success("Kayıt saat bilgisiyle eklendi!"); st.rerun()
             with t[3]:
                 py = st.selectbox("Personel Seç", sorted(df['Ad Soyad'].unique()), key="py")
-                varsay_giris = datetime.strptime(GIRIS_TARIHLERI.get(py, "2024-01-01"), "%Y-%m-%d")
-                gt = st.date_input("İşe Giriş Tarihi", value=varsay_giris)
+                gt = st.date_input("İşe Giriş Tarihi", value=datetime.strptime(GIRIS_TARIHLERI.get(py, "2024-01-01"), "%Y-%m-%d"))
                 kd = (datetime.now().year - gt.year); hk = hakedis_bul(kd)
                 ku = df[(df['Ad Soyad']==py) & (df['Tür'].str.contains("Yıllık"))]['G'].sum()
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Toplam Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
             with t[4]:
-                st.write("Son Girilen Kayıtlar")
                 st.dataframe(df[['Ad Soyad','Tür','Başlangıç','Dönüş']].tail(20), use_container_width=True)
-    else: st.info("Erişim için yönetici şifresini giriniz.")
+    else: st.info("Şifre giriniz.")
