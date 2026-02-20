@@ -4,8 +4,8 @@ import requests
 import json
 from datetime import datetime
 
-# --- GRUP AYARI ---
-GRUP_LINKI = "https://chat.whatsapp.com/LUTFEN_GRU_LINKINI_BURAYA_YAPISTIRIN"
+# --- GRUP AYARI (Güncel Linkiniz Tanımlandı) ---
+GRUP_LINKI = "https://chat.whatsapp.com/E6AvtPY5GOV7W4xrRsFbNe"
 
 LOGO_URL = "https://i.ibb.co/8LG243NJ/LOGO.png"
 st.set_page_config(page_title="Doğru Rakam İzin", layout="wide", page_icon=LOGO_URL)
@@ -20,13 +20,17 @@ PERSONEL_GIRISLERI = {
     "İBRAHİM SOYLU": "2020-09-17", "MERVE ANAYURT": "2025-03-11",
     "MİZGİN BİDER": "2025-09-15", "NEFİSE NUR HOŞGÖR": "2025-06-09",
     "ÖZLEM KAPLAN": "2024-08-01", "PINAR TANRIVERDİ": "1900-01-01",
-    "SAMET DEMİREL": "2024-02-27", "SELEN ŞEN": "2025-11-03"
+    "SAMET DEMİREL": "2024-02-27", "GÜNAY AKTEPE": "2025-09-24",
+    "ŞERİFE ŞENGÜL": "2025-05-2025", "TANER DOĞAN": "2026-02-01",
+    "ARZU ÖZELMİŞ": "2025-11-17", "SİDAL ZENGİN": "2025-11-17",
+    "SELEN ŞEN": "2025-11-03"
 }
 
+# --- AYARLAR ---
 F_TARIH, F_SAAT, F_TAM = '%d/%m/%Y', '%H:%M', '%d/%m/%Y %H:%M'
 URL = "https://script.google.com/macros/s/AKfycbyz1FkOaVRpkSAQoJrhaZcXsu_qQuYN-Y18S-yQblLIUqGBlFgoryoNW4eLfw8d0DZ1/exec"
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
-CSV_URL = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
+CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
 TR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
 IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim", "Geç Kalma"]
 
@@ -38,7 +42,7 @@ def hakedis_bul(yil):
 
 def yukle():
     try:
-        df = pd.read_csv(CSV_URL)
+        df = pd.read_csv(CSV)
         if df.empty: return pd.DataFrame(), "Ad Soyad"
         df.columns = [str(c).strip() for c in df.columns]
         ad_col = "Ad Soyad"
@@ -87,7 +91,8 @@ if m == "👤 PERSONEL GİRİŞİ":
                     st.success("Kaydedildi.")
 
     if 'wa_p' in st.session_state:
-        st.link_button("🟢 YÖNETİCİ GRUBUNA BİLDİR", f"https://wa.me/?text={requests.utils.quote(st.session_state['wa_p'])}")
+        # WhatsApp Web / Desktop üzerinden doğrudan gruba yönlendirme (Link güncellendi)
+        st.link_button("🟢 GRUBA BİLDİR", f"https://wa.me/?text={requests.utils.quote(st.session_state['wa_p'])}")
 
 else:
     if st.sidebar.text_input("Şifre", type="password") == "2020":
@@ -95,24 +100,23 @@ else:
         t = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "⏰ Geç Kalma", "📅 Yıllık İzin", "🗑️ Liste"])
         p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
 
-        with t[0]: # Karne (Gelişmiş İndirme Özellikli)
+        with t[0]: # Karne (Excel İndirme Özellikli)
             if not df.empty and 'Ay' in df.columns:
                 ay_list = sorted(df['Ay'].dropna().unique(), reverse=True)
                 if ay_list:
-                    ay_secim = st.selectbox("Analiz Edilecek Ay", ay_list)
-                    karne_df = df[df['Ay'] == ay_secim].groupby([ad_sutunu, 'Tür'])[['G', 'S']].sum()
-                    st.dataframe(karne_df, use_container_width=True)
+                    ay_secim = st.selectbox("Ay Seç", ay_list)
+                    karne_ozet = df[df['Ay']==ay_secim].groupby([ad_sutunu,'Tür'])[['G','S']].sum()
+                    st.dataframe(karne_ozet, use_container_width=True)
                     
-                    # Excel/CSV İndirme Butonu
-                    csv_data = karne_df.to_csv(index=True).encode('utf-8-sig')
+                    csv_data = karne_ozet.to_csv(index=True, sep=';').encode('utf-8-sig')
                     st.download_button(
-                        label="📥 Karne Verisini Excel (CSV) Olarak İndir",
+                        label="📥 Karneyi Excel (CSV) Olarak İndir",
                         data=csv_data,
                         file_name=f"karne_{ay_secim.replace(' ','_')}.csv",
                         mime="text/csv"
                     )
             else:
-                st.info("Henüz görüntülenecek veri bulunamadı.")
+                st.info("Henüz veri bulunamadı.")
 
         with t[1]: # Sicil
             p_sicil = st.selectbox("Personel Seç", p_listesi)
@@ -131,7 +135,7 @@ else:
             if 'wa_m' in st.session_state:
                 st.link_button("📩 GRUBA BİLGİ VER", f"https://wa.me/?text={requests.utils.quote(st.session_state['wa_m'])}")
 
-        with t[3]: # Geç Kalma
+        with t[3]: # Geç Kalma Girişi
             st.subheader("⏰ Geç Gelen Personel Kaydı")
             with st.form("g_f"):
                 g_ad = st.selectbox("Personel Seç", p_listesi)
@@ -161,4 +165,3 @@ else:
             if not df.empty: st.dataframe(df.tail(20), use_container_width=True)
             st.link_button("🚀 Google Sheets", f"https://docs.google.com/spreadsheets/d/{S_ID}/edit")
     else: st.warning("Şifre giriniz.")
-
