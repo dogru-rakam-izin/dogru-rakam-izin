@@ -20,7 +20,8 @@ PERSONEL_GIRISLERI = {
     "İBRAHİM SOYLU": "2020-09-17", "MERVE ANAYURT": "2025-03-11",
     "MİZGİN BİDER": "2025-09-15", "NEFİSE NUR HOŞGÖR": "2025-06-09",
     "ÖZLEM KAPLAN": "2024-08-01", "PINAR TANRIVERDİ": "1900-01-01",
-    "SAMET DEMİREL": "2024-02-27", "ŞERİFE ŞENGÜL": "2025-05-2025",
+    "SAMET DEMİREL": "2024-02-27", "GÜNAY AKTEPE": "2025-09-24",
+    "ŞERİFE ŞENGÜL": "2025-05-2025", "TANER DOĞAN": "2026-02-01",
     "ARZU ÖZELMİŞ": "2025-11-17", "SELEN ŞEN": "2025-11-03"
 }
 
@@ -148,5 +149,6 @@ else:
             if not df.empty: st.dataframe(df.tail(20), use_container_width=True)
             st.link_button("🚀 Google Sheets", f"https://docs.google.com/spreadsheets/d/{S_ID}/edit")
     else: st.warning("Şifre giriniz.")
+
 
 
