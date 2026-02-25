@@ -1,5 +1,4 @@
 import streamlit as st
-import pd as pd
 import pandas as pd
 import requests
 import json
@@ -159,3 +158,4 @@ else:
                     resp = requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sil_id)}))
                     st.success(f"Satır {sil_id} silme komutu gönderildi. Listeyi yenilemek için sayfayı yenileyin.")
     else: st.warning("Şifre giriniz.")
+
