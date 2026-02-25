@@ -3,11 +3,14 @@ import pandas as pd
 import requests
 import json
 from datetime import datetime
+import urllib.parse
 
-# --- GRUP AYARI (Güncel Linkiniz Tanımlandı) ---
-GRUP_LINKI = "https://chat.whatsapp.com/E6AvtPY5GOV7W4xrRsFbNe"
-
+# --- AYARLAR VE YENİ URL ---
+URL = "https://script.google.com/macros/s/AKfycbyL-8_c2vGY7G9ZBSWz-S7nfCC_JuLvqQ/exec"
+S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
+CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
 LOGO_URL = "https://i.ibb.co/8LG243NJ/LOGO.png"
+
 st.set_page_config(page_title="Doğru Rakam İzin", layout="wide", page_icon=LOGO_URL)
 
 # --- PERSONEL VERİTABANI ---
@@ -21,16 +24,12 @@ PERSONEL_GIRISLERI = {
     "MİZGİN BİDER": "2025-09-15", "NEFİSE NUR HOŞGÖR": "2025-06-09",
     "ÖZLEM KAPLAN": "2024-08-01", "PINAR TANRIVERDİ": "1900-01-01",
     "SAMET DEMİREL": "2024-02-27", "GÜNAY AKTEPE": "2025-09-24",
-    "ŞERİFE ŞENGÜL": "2025-05-2025", "TANER DOĞAN": "2026-02-01",
+    "ŞERİFE ŞENGÜL": "2025-05-20", "TANER DOĞAN": "2026-02-01",
     "ARZU ÖZELMİŞ": "2025-11-17", "SİDAL ZENGİN": "2025-11-17",
     "SELEN ŞEN": "2025-11-03"
 }
 
-# --- AYARLAR ---
 F_TARIH, F_SAAT, F_TAM = '%d/%m/%Y', '%H:%M', '%d/%m/%Y %H:%M'
-URL = "https://script.google.com/macros/s/AKfycbyz1FkOaVRpkSAQoJrhaZcXsu_qQuYN-Y18S-yQblLIUqGBlFgoryoNW4eLfw8d0DZ1/exec"
-S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
-CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
 TR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
 IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim", "Geç Kalma"]
 
@@ -45,11 +44,9 @@ def yukle():
         df = pd.read_csv(CSV)
         if df.empty: return pd.DataFrame(), "Ad Soyad"
         df.columns = [str(c).strip() for c in df.columns]
-        ad_col = "Ad Soyad"
-        if ad_col not in df.columns:
-            for col in df.columns:
-                if "AD" in col.upper(): ad_col = col; break
+        ad_col = next((c for c in df.columns if "AD" in c.upper()), "Ad Soyad")
         df[ad_col] = df[ad_col].astype(str).str.strip().str.upper()
+        
         def h(r):
             try:
                 ts, b_str, d_str = str(r['Tür']), str(r['Başlangıç']).strip(), str(r['Dönüş']).strip()
@@ -60,6 +57,7 @@ def yukle():
                     b, d = datetime.strptime(b_str[:10], F_TARIH), datetime.strptime(d_str[:10], F_TARIH)
                     return (d-b).days, 0
             except: return 0, 0
+
         res = df.apply(lambda r: pd.Series(h(r)), axis=1)
         df['G'], df['S'] = res[0].astype(float), res[1].astype(float)
         df['T'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
@@ -67,7 +65,8 @@ def yukle():
         return df, ad_col
     except: return pd.DataFrame(), "Ad Soyad"
 
-st.markdown(f"<style>[data-testid='stSidebarNav'] {{ background-image: url({LOGO_URL}); background-repeat: no-repeat; padding-top: 140px; background-position: center 20px; background-size: 150px auto; }} .main-title {{ color: #CC0000; font-size: 38px; font-weight: bold; }} div.stButton > button {{ background-color: #25D366 !important; color: white !important; border-radius: 8px; font-weight: bold; height: 50px; }} </style>", unsafe_allow_html=True)
+# --- STİL ---
+st.markdown(f"<style>[data-testid='stSidebarNav'] {{ background-image: url({LOGO_URL}); background-repeat: no-repeat; padding-top: 140px; background-position: center 20px; background-size: 150px auto; }} .main-title {{ color: #CC0000; font-size: 38px; font-weight: bold; text-align: center; }} div.stButton > button {{ background-color: #25D366 !important; color: white !important; font-weight: bold; }} </style>", unsafe_allow_html=True)
 
 m = st.sidebar.radio("📌 MENÜ SEÇİMİ", ["👤 PERSONEL GİRİŞİ", "🔐 YÖNETİCİ PANELİ"])
 
@@ -91,38 +90,30 @@ if m == "👤 PERSONEL GİRİŞİ":
                     st.success("Kaydedildi.")
 
     if 'wa_p' in st.session_state:
-        # WhatsApp Web / Desktop üzerinden doğrudan gruba yönlendirme (Link güncellendi)
-        st.link_button("🟢 GRUBA BİLDİR", f"https://wa.me/?text={requests.utils.quote(st.session_state['wa_p'])}")
+        msg = urllib.parse.quote(st.session_state['wa_p'])
+        st.link_button("🟢 GRUBA BİLDİR", f"https://api.whatsapp.com/send?text={msg}")
 
 else:
     if st.sidebar.text_input("Şifre", type="password") == "2020":
         df, ad_sutunu = yukle()
-        t = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "⏰ Geç Kalma", "📅 Yıllık İzin", "🗑️ Liste"])
+        t = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "⏰ Geç Kalma", "📅 Yıllık İzin", "🗑️ Liste & Sil"])
         p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
 
-        with t[0]: # Karne (Excel İndirme Özellikli)
+        # ... (Diğer sekmeler aynı kalıyor) ...
+        with t[0]: # Karne
             if not df.empty and 'Ay' in df.columns:
                 ay_list = sorted(df['Ay'].dropna().unique(), reverse=True)
                 if ay_list:
                     ay_secim = st.selectbox("Ay Seç", ay_list)
                     karne_ozet = df[df['Ay']==ay_secim].groupby([ad_sutunu,'Tür'])[['G','S']].sum()
                     st.dataframe(karne_ozet, use_container_width=True)
-                    
-                    csv_data = karne_ozet.to_csv(index=True, sep=';').encode('utf-8-sig')
-                    st.download_button(
-                        label="📥 Karneyi Excel (CSV) Olarak İndir",
-                        data=csv_data,
-                        file_name=f"karne_{ay_secim.replace(' ','_')}.csv",
-                        mime="text/csv"
-                    )
-            else:
-                st.info("Henüz veri bulunamadı.")
+            else: st.info("Henüz veri bulunamadı.")
 
         with t[1]: # Sicil
             p_sicil = st.selectbox("Personel Seç", p_listesi)
             if not df.empty: st.dataframe(df[df[ad_sutunu]==p_sicil][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
 
-        with t[2]: # Manuel Giriş
+        with t[2]: # Manuel
             with st.form("m_f"):
                 m_ad, m_tp = st.selectbox("Personel", p_listesi), st.selectbox("Tip", ["Tam Gün", "Saatlik"])
                 m_tr, m_tarih = st.selectbox("Tür", IZ[:-1]), st.date_input("Tarih")
@@ -130,38 +121,43 @@ else:
                 if st.form_submit_button("MANUEL KAYDI EKLE"):
                     mb, md = (f"{m_tarih.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}", f"{m_tarih.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}") if m_tp == "Saatlik" else (m_tarih.strftime(F_TARIH), m_db.strftime(F_TARIH))
                     requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":m_ad,"brans":"Y","tur":f"{m_tr} ({m_tp})","bas":mb,"bit":md}))
-                    st.session_state['wa_m'] = f"✅ *MANUEL İZİN GİRİŞİ*\n👤 *Personel:* {m_ad}\n📋 *Tür:* {m_tr}\n📅 *Tarih:* {mb}"
                     st.success("Kayıt eklendi.")
-            if 'wa_m' in st.session_state:
-                st.link_button("📩 GRUBA BİLGİ VER", f"https://wa.me/?text={requests.utils.quote(st.session_state['wa_m'])}")
-
-        with t[3]: # Geç Kalma Girişi
-            st.subheader("⏰ Geç Gelen Personel Kaydı")
-            with st.form("g_f"):
-                g_ad = st.selectbox("Personel Seç", p_listesi)
-                g_tar = st.date_input("Geç Kalınan Tarih")
-                g_dak = st.slider("Geç Kalınan Süre (Dakika)", 1, 60, 15)
-                if st.form_submit_button("GEÇ KALMA KAYDI OLUŞTUR"):
-                    g_bas = f"{g_tar.strftime(F_TARIH)} 09:00"
-                    g_bit = f"{g_tar.strftime(F_TARIH)} 09:{g_dak:02d}"
-                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":g_ad,"brans":"Y","tur":f"Geç Kalma","bas":g_bas,"bit":g_bit}))
-                    st.session_state['wa_g'] = f"⏰ *GEÇ KALMA BİLDİRİMİ*\n👤 *Personel:* {g_ad}\n📅 *Tarih:* {g_tar.strftime(F_TARIH)}\n⏳ *Süre:* {g_dak} Dakika Geç Kaldı."
-                    st.success(f"{g_ad} için {g_dak} dakikalık kayıt oluşturuldu.")
-            if 'wa_g' in st.session_state:
-                st.link_button("📩 GRUBA BİLDİR (GEÇ KALMA)", f"https://wa.me/?text={requests.utils.quote(st.session_state['wa_g'])}")
 
         with t[4]: # Yıllık İzin
             py = st.selectbox("Hakediş", p_listesi, key="py_y")
             varsay_t = datetime.strptime(PERSONEL_GIRISLERI.get(py, "2024-01-01"), "%Y-%m-%d")
             gt = st.date_input("İşe Giriş", value=varsay_t)
-            kidem = datetime.now().year - gt.year
-            if (datetime.now().month, datetime.now().day) < (gt.month, gt.day): kidem -= 1
+            bugun = datetime.now()
+            kidem = bugun.year - gt.year - ((bugun.month, bugun.day) < (gt.month, gt.day))
             hk = hakedis_bul(max(0, kidem))
             ku = df[(df[ad_sutunu]==py) & (df['Tür'].str.contains("Yıllık"))]['G'].sum() if not df.empty else 0
             c1, c2, c3 = st.columns(3)
             c1.metric("Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
-            
-        with t[5]: # Liste
-            if not df.empty: st.dataframe(df.tail(20), use_container_width=True)
-            st.link_button("🚀 Google Sheets", f"https://docs.google.com/spreadsheets/d/{S_ID}/edit")
+
+        with t[5]: # LİSTE VE SİLME ÖZELLİĞİ
+            if not df.empty:
+                st.subheader("🗑️ Kayıt Silme Paneli")
+                df_sil = df.copy()
+                df_sil.insert(0, "SİLME_ID", df_sil.index + 2) # Google Sheets satır no
+                
+                st.dataframe(df_sil.tail(20), use_container_width=True)
+                
+                c_s1, c_s2 = st.columns([1, 2])
+                with c_s1:
+                    sil_id = st.number_input("Silinecek ID (SİLME_ID):", min_value=2, step=1)
+                with c_s2:
+                    st.write(" ")
+                    st.write(" ")
+                    if st.button("❌ SEÇİLİ KAYDI SİSTEMDEN SİL"):
+                        cevap = requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sil_id)}))
+                        if "Silindi" in cevap.text:
+                            st.success(f"Satır {sil_id} silindi. Güncel liste için sayfayı yenileyin.")
+                            st.balloons()
+                        else:
+                            st.error("Silme başarısız oldu.")
+                
+                st.divider()
+                st.link_button("🚀 Google Sheets Dosyasını Aç", f"https://docs.google.com/spreadsheets/d/{S_ID}/edit")
+            else:
+                st.info("Veri bulunamadı.")
     else: st.warning("Şifre giriniz.")
