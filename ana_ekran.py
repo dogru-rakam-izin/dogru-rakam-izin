@@ -85,7 +85,7 @@ if m == "👤 PERSONEL GİRİŞİ":
             if ad:
                 requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}))
                 st.session_state['wa_p'] = f"🔔 *YENİ İZİN TALEBİ*\n👤 *Personel:* {ad}\n📋 *Tür:* {t1}\n🕒 *Başlangıç:* {b}\n🏠 *Dönüş:* {d}"
-                st.success("Google Sheets'e Kaydedildi.")
+                st.success("Kaydedildi.")
 
     if 'wa_p' in st.session_state:
         msg = urllib.parse.quote(st.session_state['wa_p'])
@@ -97,53 +97,44 @@ else:
         t = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "⏰ Geç Kalma", "📅 Yıllık İzin", "🗑️ Liste & Sil"])
         p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
 
-        with t[0]: # Karne
+        with t[0]: # Karne + Excel İndirme
             if not df.empty and 'Ay' in df.columns:
                 ay_secim = st.selectbox("Ay Seç", sorted(df['Ay'].dropna().unique(), reverse=True))
-                st.dataframe(df[df['Ay']==ay_secim].groupby([ad_sutunu,'Tür'])[['G','S']].sum(), use_container_width=True)
+                karne_data = df[df['Ay']==ay_secim].groupby([ad_sutunu,'Tür'])[['G','S']].sum()
+                st.dataframe(karne_data, use_container_width=True)
+                
+                # Excel/CSV İndirme Butonu
+                csv = karne_data.to_csv(index=True, sep=';', encoding='utf-8-sig').encode('utf-8-sig')
+                st.download_button(label="📥 Karneyi Excel Olarak İndir", data=csv, file_name=f"karne_{ay_secim}.csv", mime='text/csv')
+            else: st.info("Veri yok.")
 
         with t[1]: # Sicil
             p_sicil = st.selectbox("Personel Seç", p_listesi)
             if not df.empty: st.dataframe(df[df[ad_sutunu]==p_sicil][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
 
-        with t[2]: # Manuel
-            with st.form("m_f"):
-                m_ad, m_tp = st.selectbox("Personel", p_listesi), st.selectbox("Tip", ["Tam Gün", "Saatlik"])
-                m_tr, m_tarih = st.selectbox("Tür", IZ[:-1]), st.date_input("Tarih")
-                ms1, ms2 = st.time_input("Çıkış"), st.time_input("Dönüş")
-                m_db = st.date_input("İş Başı")
-                if st.form_submit_button("MANUEL KAYDI EKLE"):
-                    mb, md = (f"{m_tarih.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}", f"{m_tarih.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}") if m_tp == "Saatlik" else (m_tarih.strftime(F_TARIH), m_db.strftime(F_TARIH))
-                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":m_ad,"brans":"Y","tur":f"{m_tr} ({m_tp})","bas":mb,"bit":md}))
-                    st.success("Google Sheets'e Eklendi.")
-
-        with t[3]: # GEÇ KALMA (Eksik Olan Kısım)
+        with t[3]: # Geç Kalma
             st.subheader("⏰ Geç Gelen Personel Kaydı")
             with st.form("g_f"):
                 g_ad = st.selectbox("Personel Seç", p_listesi)
                 g_tar = st.date_input("Geç Kalınan Tarih")
-                g_dak = st.slider("Geç Kalınan Süre (Dakika)", 1, 60, 15)
-                if st.form_submit_button("GEÇ KALMA KAYDI OLUŞTUR"):
-                    g_bas = f"{g_tar.strftime(F_TARIH)} 09:00"
-                    g_bit = f"{g_tar.strftime(F_TARIH)} 09:{g_dak:02d}"
-                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":g_ad,"brans":"Y","tur":f"Geç Kalma","bas":g_bas,"bit":g_bit}))
-                    st.success(f"{g_ad} için Google Sheets'e kayıt yapıldı.")
+                g_dak = st.slider("Dakika", 1, 60, 15)
+                if st.form_submit_button("KAYDET"):
+                    g_bas, g_bit = f"{g_tar.strftime(F_TARIH)} 09:00", f"{g_tar.strftime(F_TARIH)} 09:{g_dak:02d}"
+                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":g_ad,"brans":"Y","tur":"Geç Kalma","bas":g_bas,"bit":g_bit}))
+                    st.success("Kaydedildi.")
 
-        with t[4]: # Yıllık İzin
-            py = st.selectbox("Hakediş", p_listesi, key="py_y")
-            varsay_t = datetime.strptime(PERSONEL_GIRISLERI.get(py, "2024-01-01"), "%Y-%m-%d")
-            gt = st.date_input("İşe Giriş", value=varsay_t)
-            kidem = datetime.now().year - gt.year - ((datetime.now().month, datetime.now().day) < (gt.month, gt.day))
-            hk, ku = hakedis_bul(max(0, kidem)), (df[(df[ad_sutunu]==py) & (df['Tür'].str.contains("Yıllık"))]['G'].sum() if not df.empty else 0)
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
-
-        with t[5]: # Liste & Sil
+        with t[5]: # Liste & Sil + Genel İndirme
             if not df.empty:
                 df_sil = df.copy(); df_sil.insert(0, "SİLME_ID", df_sil.index + 2)
-                st.dataframe(df_sil.tail(20), use_container_width=True)
+                st.dataframe(df_sil.tail(30), use_container_width=True)
+                
+                # Tüm Listeyi İndir
+                csv_full = df.to_csv(index=False, sep=';', encoding='utf-8-sig').encode('utf-8-sig')
+                st.download_button(label="📥 Tüm Listeyi Excel Olarak İndir", data=csv_full, file_name="tum_izin_listesi.csv", mime='text/csv')
+                
+                st.divider()
                 sil_id = st.number_input("Silinecek ID:", min_value=2, step=1)
-                if st.button("❌ SEÇİLİ KAYDI SİSİTEMDEN SİL"):
+                if st.button("❌ SEÇİLİ KAYDI SİL"):
                     requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sil_id)}))
-                    st.success("Silindi. Sayfayı yenileyin.")
+                    st.success("Silindi.")
     else: st.warning("Şifre giriniz.")
