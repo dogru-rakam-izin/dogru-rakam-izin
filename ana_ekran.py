@@ -56,13 +56,13 @@ def yukle():
                     saat = int(diff_seconds // 3600)
                     dakika = int((diff_seconds % 3600) // 60)
                     
-                    # Düzenlenmiş Boşluklu Format
+                    # Veriler birleştiğinde karışmaması için sonuna " - " ekliyoruz
                     if saat > 0 and dakika > 0:
-                        return 0, f"{saat} Sa {dakika} Dk"
+                        return 0, f"{saat} Sa {dakika} Dk  -  "
                     elif saat > 0:
-                        return 0, f"{saat} Sa"
+                        return 0, f"{saat} Sa  -  "
                     else:
-                        return 0, f"{dakika} Dk"
+                        return 0, f"{dakika} Dk  -  "
                 else:
                     b, d = datetime.strptime(b_str[:10], F_TARIH), datetime.strptime(d_str[:10], F_TARIH)
                     return (d-b).days, 0
@@ -111,8 +111,9 @@ else:
             st.subheader("📊 Aylık Personel Karnesi")
             if not df.empty and 'Ay' in df.columns:
                 ay_secim = st.selectbox("Ay Seçiniz", sorted(df['Ay'].dropna().unique(), reverse=True))
-                # Saatlik verileri birleştirirken araya boşluk ekle
+                # Saat sütunundaki son tireyi temizlemek için map kullanıyoruz
                 karne_data = df[df['Ay']==ay_secim].groupby([ad_sutunu,'Tür'])[['G','S']].sum()
+                karne_data['S'] = karne_data['S'].str.rstrip(' - ') 
                 st.dataframe(karne_data, use_container_width=True)
                 
                 csv_karne = karne_data.to_csv(index=True, sep=';', encoding='utf-8-sig').encode('utf-8-sig')
@@ -124,6 +125,7 @@ else:
             p_sicil = st.selectbox("Personel Seçiniz", p_listesi)
             if not df.empty:
                 sicil_df = df[df[ad_sutunu]==p_sicil][['Başlangıç','Dönüş','Tür','G','S']]
+                sicil_df['S'] = sicil_df['S'].str.rstrip(' - ')
                 st.dataframe(sicil_df, use_container_width=True)
                 csv_sicil = sicil_df.to_csv(index=False, sep=';', encoding='utf-8-sig').encode('utf-8-sig')
                 st.download_button(f"📥 {p_sicil} Sicilini İndir", data=csv_sicil, file_name=f"Sicil_{p_sicil}.csv", mime="text/csv")
