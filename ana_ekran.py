@@ -55,8 +55,14 @@ def yukle():
                     diff_seconds = (d - b).total_seconds()
                     saat = int(diff_seconds // 3600)
                     dakika = int((diff_seconds % 3600) // 60)
-                    if saat > 0: return 0, f"{saat} Sa {dakika} Dk"
-                    else: return 0, f"{dakika} Dk"
+                    
+                    # Düzenlenmiş Boşluklu Format
+                    if saat > 0 and dakika > 0:
+                        return 0, f"{saat} Sa {dakika} Dk"
+                    elif saat > 0:
+                        return 0, f"{saat} Sa"
+                    else:
+                        return 0, f"{dakika} Dk"
                 else:
                     b, d = datetime.strptime(b_str[:10], F_TARIH), datetime.strptime(d_str[:10], F_TARIH)
                     return (d-b).days, 0
@@ -101,26 +107,24 @@ else:
         t = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "⏰ Geç Kalma", "📅 Yıllık İzin", "🗑️ Liste & Sil"])
         p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
 
-        with t[0]: # KARNE SEKEMESİ
+        with t[0]: # KARNE
             st.subheader("📊 Aylık Personel Karnesi")
             if not df.empty and 'Ay' in df.columns:
                 ay_secim = st.selectbox("Ay Seçiniz", sorted(df['Ay'].dropna().unique(), reverse=True))
+                # Saatlik verileri birleştirirken araya boşluk ekle
                 karne_data = df[df['Ay']==ay_secim].groupby([ad_sutunu,'Tür'])[['G','S']].sum()
                 st.dataframe(karne_data, use_container_width=True)
                 
-                # Excel İndir Butonu
                 csv_karne = karne_data.to_csv(index=True, sep=';', encoding='utf-8-sig').encode('utf-8-sig')
                 st.download_button("📥 Karneyi Excel Olarak İndir", data=csv_karne, file_name=f"Karne_{ay_secim}.csv", mime="text/csv")
             else: st.info("Veri bulunamadı.")
 
-        with t[1]: # SİCİL SEKEMESİ
+        with t[1]: # SİCİL
             st.subheader("👤 Personel Sicil Özeti")
             p_sicil = st.selectbox("Personel Seçiniz", p_listesi)
             if not df.empty:
                 sicil_df = df[df[ad_sutunu]==p_sicil][['Başlangıç','Dönüş','Tür','G','S']]
                 st.dataframe(sicil_df, use_container_width=True)
-                
-                # Excel İndir Butonu
                 csv_sicil = sicil_df.to_csv(index=False, sep=';', encoding='utf-8-sig').encode('utf-8-sig')
                 st.download_button(f"📥 {p_sicil} Sicilini İndir", data=csv_sicil, file_name=f"Sicil_{p_sicil}.csv", mime="text/csv")
 
