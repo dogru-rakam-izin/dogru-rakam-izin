@@ -101,7 +101,30 @@ else:
         t = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "⏰ Geç Kalma", "📅 Yıllık İzin", "🗑️ Liste & Sil"])
         p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
 
-        with t[2]: # MANUEL GİRİŞ SEKEMESİ
+        with t[0]: # KARNE SEKEMESİ
+            st.subheader("📊 Aylık Personel Karnesi")
+            if not df.empty and 'Ay' in df.columns:
+                ay_secim = st.selectbox("Ay Seçiniz", sorted(df['Ay'].dropna().unique(), reverse=True))
+                karne_data = df[df['Ay']==ay_secim].groupby([ad_sutunu,'Tür'])[['G','S']].sum()
+                st.dataframe(karne_data, use_container_width=True)
+                
+                # Excel İndir Butonu
+                csv_karne = karne_data.to_csv(index=True, sep=';', encoding='utf-8-sig').encode('utf-8-sig')
+                st.download_button("📥 Karneyi Excel Olarak İndir", data=csv_karne, file_name=f"Karne_{ay_secim}.csv", mime="text/csv")
+            else: st.info("Veri bulunamadı.")
+
+        with t[1]: # SİCİL SEKEMESİ
+            st.subheader("👤 Personel Sicil Özeti")
+            p_sicil = st.selectbox("Personel Seçiniz", p_listesi)
+            if not df.empty:
+                sicil_df = df[df[ad_sutunu]==p_sicil][['Başlangıç','Dönüş','Tür','G','S']]
+                st.dataframe(sicil_df, use_container_width=True)
+                
+                # Excel İndir Butonu
+                csv_sicil = sicil_df.to_csv(index=False, sep=';', encoding='utf-8-sig').encode('utf-8-sig')
+                st.download_button(f"📥 {p_sicil} Sicilini İndir", data=csv_sicil, file_name=f"Sicil_{p_sicil}.csv", mime="text/csv")
+
+        with t[2]: # MANUEL GİRİŞ
             st.subheader("📝 Manuel Kayıt")
             with st.form("m_f"):
                 m_ad = st.selectbox("Personel", p_listesi); m_tp = st.selectbox("Tip", ["Tam Gün", "Saatlik"])
@@ -118,19 +141,7 @@ else:
             if 'm_wa' in st.session_state:
                 st.link_button("🟢 WHATSAPP İLE BİLDİR (MANUEL)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['m_wa'])}", use_container_width=True)
 
-        with t[0]: # Karne (Diğer sekmeler aynı şekilde devam ediyor...)
-            if not df.empty and 'Ay' in df.columns:
-                ay_secim = st.selectbox("Ay Seç", sorted(df['Ay'].dropna().unique(), reverse=True))
-                karne_data = df[df['Ay']==ay_secim].groupby([ad_sutunu,'Tür'])[['G','S']].sum()
-                st.dataframe(karne_data, use_container_width=True)
-            else: st.info("Veri yok.")
-
-        with t[1]: # Sicil
-            st.subheader("👤 Personel Sicili")
-            p_sicil = st.selectbox("Personel", p_listesi)
-            if not df.empty: st.dataframe(df[df[ad_sutunu]==p_sicil][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
-
-        with t[3]: # Geç Kalma
+        with t[3]: # GEÇ KALMA
             st.subheader("⏰ Geç Kalma Girişi")
             with st.form("g_f"):
                 g_ad, g_tar = st.selectbox("Personel", p_listesi), st.date_input("Geç Kalınan Gün")
@@ -140,7 +151,7 @@ else:
                     requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":g_ad,"brans":"Y","tur":"Geç Kalma","bas":g_bas,"bit":g_bit}))
                     st.success("Kayıt yapıldı.")
 
-        with t[4]: # Yıllık İzin
+        with t[4]: # YILLIK İZİN
             py = st.selectbox("Hakediş Sorgula", p_listesi)
             varsay_t = datetime.strptime(PERSONEL_GIRISLERI.get(py, "2024-01-01"), "%Y-%m-%d")
             gt = st.date_input("İşe Giriş", value=varsay_t)
@@ -149,10 +160,13 @@ else:
             c1, c2, c3 = st.columns(3)
             c1.metric("Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
 
-        with t[5]: # Liste & Sil
+        with t[5]: # LİSTE & SİL
             if not df.empty:
                 df_sil = df.copy(); df_sil.insert(0, "SİLME_ID", df_sil.index + 2)
                 st.dataframe(df_sil.tail(30), use_container_width=True)
+                csv_full = df.to_csv(index=False, sep=';', encoding='utf-8-sig').encode('utf-8-sig')
+                st.download_button(label="📥 Tüm Ham Veriyi İndir", data=csv_full, file_name="Tum_Liste.csv")
+                st.divider()
                 sid = st.number_input("Silinecek No:", min_value=2, step=1)
                 if st.button("❌ SEÇİLİ KAYDI SİL"):
                     requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sid)}))
