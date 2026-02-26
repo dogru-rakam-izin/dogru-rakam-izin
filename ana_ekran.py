@@ -52,14 +52,21 @@ def yukle():
                 ts, b_str, d_str = str(r['Tür']), str(r['Başlangıç']).strip(), str(r['Dönüş']).strip()
                 if "Saatlik" in ts or "Geç Kalma" in ts:
                     b, d = datetime.strptime(b_str, F_TAM), datetime.strptime(d_str, F_TAM)
-                    return 0, round((d-b).total_seconds()/3600, 2)
+                    diff_seconds = (d - b).total_seconds()
+                    saat = int(diff_seconds // 3600)
+                    dakika = int((diff_seconds % 3600) // 60)
+                    # 0,67 yerine formatlı metin döner
+                    if saat > 0:
+                        return 0, f"{saat} Sa {dakika} Dk"
+                    else:
+                        return 0, f"{dakika} Dk"
                 else:
                     b, d = datetime.strptime(b_str[:10], F_TARIH), datetime.strptime(d_str[:10], F_TARIH)
                     return (d-b).days, 0
             except: return 0, 0
 
         res = df.apply(lambda r: pd.Series(h(r)), axis=1)
-        df['G'], df['S'] = res[0].astype(float), res[1].astype(float)
+        df['G'], df['S'] = res[0], res[1] # Günler sayı, Saatler metin oldu
         df['T'] = pd.to_datetime(df['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
         df['Ay'] = df['T'].dt.strftime('%B').map(TR) + " " + df['T'].dt.strftime('%Y')
         return df, ad_col
@@ -75,22 +82,27 @@ if m == "👤 PERSONEL GİRİŞİ":
     tp = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
     with st.form("p_f"):
-        t1, t2 = st.selectbox("Tür", IZ[:-1]), st.date_input("İzin Günü")
+        t1 = st.selectbox("Tür", IZ[:-1])
+        t2 = st.date_input("İzin Günü")
         if tp == "Saatlik":
-            s1, s2 = st.time_input("Çıkış"), st.time_input("Dönüş")
+            s1 = st.time_input("Çıkış")
+            s2 = st.time_input("Dönüş")
             b, d = f"{t2.strftime(F_TARIH)} {s1.strftime(F_SAAT)}", f"{t2.strftime(F_TARIH)} {s2.strftime(F_SAAT)}"
         else:
-            dn = st.date_input("İş Başı"); b, d = t2.strftime(F_TARIH), dn.strftime(F_TARIH)
+            dn = st.date_input("İş Başı")
+            b, d = t2.strftime(F_TARIH), dn.strftime(F_TARIH)
         
         kaydet = st.form_submit_button("SİSTEME KAYDET")
-        if kaydet:
-            if ad:
-                requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}))
-                st.session_state['wa_msg'] = f"🔔 *YENİ İZİN TALEBİ*\n👤 *Personel:* {ad}\n📋 *Tür:* {t1} ({tp})\n🕒 *Başlangıç:* {b}\n🏠 *Dönüş:* {d}"
-                st.success("Kayıt Başarılı. Aşağıdaki butondan WhatsApp paylaşımı yapabilirsiniz.")
-            else:
-                st.error("Lütfen Ad Soyad giriniz!")
+        
+    if kaydet:
+        if ad:
+            requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}))
+            st.session_state['wa_msg'] = f"🔔 *YENİ İZİN TALEBİ*\n👤 *Personel:* {ad}\n📋 *Tür:* {t1} ({tp})\n🕒 *Başlangıç:* {b}\n🏠 *Dönüş:* {d}"
+            st.success("Kayıt Başarılı. Aşağıdaki yeşil butona tıklayarak WhatsApp üzerinden yöneticiye bildirin.")
+        else:
+            st.error("Lütfen Ad Soyad giriniz!")
 
+    # WhatsApp Butonu (Daima formun altında, mesaj varsa görünür)
     if 'wa_msg' in st.session_state:
         msg = urllib.parse.quote(st.session_state['wa_msg'])
         st.link_button("🟢 WHATSAPP İLE BİLDİR", f"https://api.whatsapp.com/send?text={msg}", use_container_width=True)
@@ -119,9 +131,12 @@ else:
         with t[2]: # Manuel
             st.subheader("📝 Manuel Kayıt")
             with st.form("m_f"):
-                m_ad, m_tp = st.selectbox("Personel", p_listesi), st.selectbox("Tip", ["Tam Gün", "Saatlik"])
-                m_tr, m_tarih = st.selectbox("Tür", IZ[:-1]), st.date_input("Tarih")
-                ms1, ms2 = st.time_input("Çıkış"), st.time_input("Dönüş")
+                m_ad = st.selectbox("Personel", p_listesi)
+                m_tp = st.selectbox("Tip", ["Tam Gün", "Saatlik"])
+                m_tr = st.selectbox("Tür", IZ[:-1])
+                m_tarih = st.date_input("Tarih")
+                ms1 = st.time_input("Çıkış")
+                ms2 = st.time_input("Dönüş")
                 m_db = st.date_input("İş Başı")
                 if st.form_submit_button("MANUEL EKLE"):
                     mb, md = (f"{m_tarih.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}", f"{m_tarih.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}") if m_tp == "Saatlik" else (m_tarih.strftime(F_TARIH), m_db.strftime(F_TARIH))
@@ -144,7 +159,7 @@ else:
             varsay_t = datetime.strptime(PERSONEL_GIRISLERI.get(py, "2024-01-01"), "%Y-%m-%d")
             gt = st.date_input("İşe Giriş", value=varsay_t)
             kidem = datetime.now().year - gt.year - ((datetime.now().month, datetime.now().day) < (gt.month, gt.day))
-            hk, ku = hakedis_bul(max(0, kidem)), (df[(df[ad_sutunu]==py) & (df['Tür'].str.contains("Yıllık"))]['G'].sum() if not df.empty else 0)
+            hk, ku = hakedis_bul(max(0, kidem)), (pd.to_numeric(df[(df[ad_sutunu]==py) & (df['Tür'].str.contains("Yıllık"))]['G'], errors='coerce').sum() if not df.empty else 0)
             c1, c2, c3 = st.columns(3)
             c1.metric("Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
 
