@@ -96,28 +96,39 @@ else:
             if not df_b.empty:
                 df_b_goster = df_b.copy()
                 df_b_goster.insert(0, "ID", df_b_goster.index + 2)
-                # BİTİŞ (Dönüş) SÜTUNU EKLENDİ
                 st.table(df_b_goster[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
                 
                 c1, c2 = st.columns(2)
                 onay_id = c1.number_input("İşlem Yapılacak ID:", min_value=2, step=1, key="onay_id")
                 
                 if c2.button("✅ SEÇİLENİ ONAYLA"):
-                    # HATA KONTROLÜ: ID tabloda var mı?
                     secim = df_b_goster[df_b_goster["ID"] == onay_id]
                     if not secim.empty:
-                        requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(onay_id)}))
+                        # Bilgileri çek
                         pers_ad = secim[ad_c].values[0]
-                        st.session_state['wa_msg'] = f"✅ *SAYIN {pers_ad},*\n\n*İZİN TALEBİNİZ ONAYLANMIŞTIR.*\n\n📝 Programı düzenleyip dilekçenizi iletmeyi unutmayınız."
-                        st.success(f"{pers_ad} onaylandı. WhatsApp butonu aşağıda.")
+                        izin_turu = secim["Tür"].values[0]
+                        baslangic = secim["Başlangıç"].values[0]
+                        donus = secim["Dönüş"].values[0]
+                        
+                        # Google Sheets Onayla
+                        requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(onay_id)}))
+                        
+                        # WhatsApp Mesajını Hazırla (MAHİYET VE TARİH EKLENDİ)
+                        msg = f"✅ *SAYIN {pers_ad},*\n\n"
+                        msg += f"🗓 *{baslangic} - {donus}* tarihlerindeki\n"
+                        msg += f"📋 *{izin_turu}* talebiniz onaylanmıştır.\n\n"
+                        msg += "📝 Programı düzenleyip dilekçenizi yönetime iletmeyi unutmayınız."
+                        
+                        st.session_state['wa_msg'] = msg
+                        st.success(f"{pers_ad} için onay verildi!")
                     else:
-                        st.error("Girdiğiniz ID listede bulunamadı!")
+                        st.error("Hatalı ID!")
                 
                 if 'wa_msg' in st.session_state:
-                    st.link_button("🟢 ONAY MESAJI GÖNDER", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_msg'])}", use_container_width=True)
+                    st.link_button("🟢 ONAY MESAJINI PERSONELE GÖNDER", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_msg'])}", use_container_width=True)
             else: st.success("Bekleyen yok.")
 
-        # DİĞER SEKMELER (DEĞİŞMEDİ)
+        # DİĞER SEKMELER AYNI KALIYOR
         with t[1]: # Karne
             if not df_o.empty:
                 ay_sec = st.selectbox("Ay Seç", sorted(df_o['Ay'].dropna().unique(), reverse=True))
