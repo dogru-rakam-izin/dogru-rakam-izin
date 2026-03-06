@@ -38,15 +38,19 @@ def hakedis_bul(yil):
 def yukle():
     try:
         df = pd.read_csv(CSV)
-        if df.empty: return pd.DataFrame(), "Ad Soyad"
+        if df.empty: return pd.DataFrame(), pd.DataFrame(), "Ad Soyad", None
         df.columns = [str(c).strip() for c in df.columns]
         ad_col = next((c for c in df.columns if "AD" in c.upper()), "Ad Soyad")
         durum_col = next((c for c in df.columns if "DURUM" in c.upper()), None)
-        
         df[ad_col] = df[ad_col].astype(str).str.strip().str.upper()
         
-        # Sadece ONAYLANMIŞ veriler karneye/sicile yansısın
-        df_onayli = df[df[durum_col] == "Onaylandı"].copy() if durum_col else df.copy()
+        # DURUM sütunu yoksa oluştur (Eskilerin kaybolmaması için)
+        if durum_col is None:
+            df["Durum"] = "Onaylandı"
+            durum_col = "Durum"
+        
+        # Karneyi ve Sicili sadece 'Onaylandı' olanlarla doldur
+        df_onayli = df[df[durum_col].astype(str).str.contains("Onaylandı", na=False)].copy()
         
         def h(r):
             try:
@@ -90,41 +94,42 @@ if m == "👤 PERSONEL İZİN TALEBİ":
         
         if st.form_submit_button("TALEBİ GÖNDER"):
             if ad:
-                # Veriyi 'Onay Bekliyor' olarak gönderiyoruz (Durum sütunu için en sona ekledik)
+                # Durum sütunu için "Onay Bekliyor" ekliyoruz
                 requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d, "durum": "Onay Bekliyor"}))
                 st.session_state['wa_msg'] = f"🔔 *İİZİN TALEP BİLDİRİMİ*\n👤 *Personel:* {ad}\n📋 *Tür:* {t1} ({tp})\n{detay}\n\n📝 *Not:* İzniniz onaylandığında; programı düzenleyip dilekçenizi iletmeyi unutmayınız."
-                st.success("Talebiniz yöneticiye iletildi. Lütfen WhatsApp butonuna tıklayarak grubu bilgilendirin.")
+                st.success("Talebiniz iletildi. WhatsApp ile gruba bildirmeyi unutmayın.")
 
     if 'wa_msg' in st.session_state:
         msg = urllib.parse.quote(st.session_state['wa_msg'])
         st.link_button("🟢 WHATSAPP İLE GRUBA YAZ", f"https://api.whatsapp.com/send?text={msg}", use_container_width=True)
 
 else:
-    if st.sidebar.text_input("Yönetici Şifresi", type="password") == "2020":
+    if st.sidebar.text_input("Şifre", type="password") == "2020":
         df_all, df_onayli, ad_sutunu, durum_sutunu = yukle()
         t = st.tabs(["🔔 Onay Bekleyenler", "📊 Karne", "👤 Sicil", "📝 Manuel", "⏰ Geç Kalma", "📅 Yıllık İzin", "🗑️ Liste"])
         p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
 
         with t[0]: # ONAY BEKLEYENLER
-            st.subheader("Onay Bekleyen İzin İstekleri")
-            if durum_sutunu and not df_all.empty:
-                bekleyenler = df_all[df_all[durum_sutunu] == "Onay Bekliyor"].copy()
-                if not bekleyenler.empty:
-                    bekleyenler.insert(0, "ISLEM_ID", bekleyenler.index + 2)
-                    st.table(bekleyenler[[ "ISLEM_ID", ad_sutunu, "Tür", "Başlangıç", "Dönüş"]])
-                    
-                    c1, c2 = st.columns(2)
-                    islem_id = c1.number_input("İşlem Yapılacak ID:", min_value=2, step=1)
-                    if c2.button("✅ SEÇİLENİ ONAYLA"):
-                        # Google Script'e 'onayla' komutu gönderilmeli (veya manuel güncellenmeli)
-                        # Şimdilik mevcut silme mantığıyla benzer bir yapı kurulabilir
-                        st.info("Onaylama işlemi için Sheets üzerinden 'Durum' sütununu 'Onaylandı' yapınız veya Script'i güncelleyelim.")
+            st.subheader("Onay Bekleyen İstekler")
+            if not df_all.empty:
+                bekleyen = df_all[df_all[durum_sutunu] == "Onay Bekliyor"].copy()
+                if not bekleyen.empty:
+                    bekleyen.insert(0, "SATIR_NO", bekleyen.index + 2)
+                    st.dataframe(bekleyen[["SATIR_NO", ad_sutunu, "Tür", "Başlangıç", "Dönüş"]], use_container_width=True)
+                    st.info("Onaylamak için Google Sheets üzerinden bu satırın Durumunu 'Onaylandı' yapınız.")
                 else: st.success("Bekleyen istek yok.")
 
-        with t[1]: # Karne (Sadece Onaylılar)
+        with t[1]: # Karne
             if not df_onayli.empty:
                 ay_secim = st.selectbox("Ay Seç", sorted(df_onayli['Ay'].dropna().unique(), reverse=True))
                 st.dataframe(df_onayli[df_onayli['Ay']==ay_secim].groupby([ad_sutunu,'Tür'])[['G','S']].sum())
-            else: st.info("Onaylanmış veri bulunamadı.")
-            
-        # Diğer sekmeler (Sicil, Manuel vb.) df_onayli üzerinden çalışacak şekilde mevcudiyetini korur.
+            else: st.warning("Henüz onaylanmış kayıt yok.")
+
+        with t[2]: # Sicil
+            ps = st.selectbox("Personel", p_listesi)
+            if not df_onayli.empty:
+                st.dataframe(df_onayli[df_onayli[ad_sutunu]==ps][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
+
+        with t[6]: # Liste (Tüm liste burada görünür)
+            st.subheader("Tüm Kayıtlar (Onaylı/Bekleyen)")
+            st.dataframe(df_all, use_container_width=True)
