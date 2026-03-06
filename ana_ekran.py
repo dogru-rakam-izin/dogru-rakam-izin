@@ -75,27 +75,32 @@ if m == "👤 PERSONEL GİRİŞİ":
     tp = st.radio("İzin Süresi", ["Tam Gün", "Saatlik"], horizontal=True)
     
     with st.form("p_f"):
-        t1, t2 = st.selectbox("Tür", IZ[:-1]), st.date_input("İzin Günü")
+        t1, t2 = st.selectbox("Tür", IZ[:-1]), st.date_input("İzin Başlangıç Tarihi")
         if tp == "Saatlik":
-            s1, s2 = st.time_input("Çıkış"), st.time_input("Dönüş")
+            s1, s2 = st.time_input("Çıkış Saati"), st.time_input("Dönüş Saati")
             b, d = f"{t2.strftime(F_TARIH)} {s1.strftime(F_SAAT)}", f"{t2.strftime(F_TARIH)} {s2.strftime(F_SAAT)}"
+            detay = f"⏰ *Saat Aralığı:* {s1.strftime(F_SAAT)} - {s2.strftime(F_SAAT)}"
         else:
-            dn = st.date_input("İş Başı"); b, d = t2.strftime(F_TARIH), dn.strftime(F_TARIH)
+            dn = st.date_input("İş Başı Tarihi")
+            b, d = t2.strftime(F_TARIH), dn.strftime(F_TARIH)
+            detay = f"📅 *Tarih Aralığı:* {b} - {d}"
         
         kaydet = st.form_submit_button("SİSTEME KAYDET")
         if kaydet:
             if ad:
                 requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d}))
-                st.session_state['wa_msg'] = f"🔔 *YENİ İZİN TALEBİ*\n👤 *Personel:* {ad}\n📋 *Tür:* {t1} ({tp})\n🕒 *Başlangıç:* {b}\n🏠 *Dönüş:* {d}"
-                st.success("Kayıt Başarılı. WhatsApp butonunu kullanabilirsiniz.")
+                # WhatsApp Mesajı Oluşturma (Detaylı)
+                st.session_state['wa_msg'] = f"🔔 *YENİ İZİN TALEBİ*\n👤 *Personel:* {ad}\n📋 *Tür:* {t1} ({tp})\n{detay}\n✅ *Bilginize sunarım.*"
+                st.success("Kayıt Başarılı. Şimdi aşağıdaki butona tıklayarak WhatsApp grubuna bildirebilirsiniz.")
             else:
-                st.error("Ad Soyad boş bırakılamaz!")
+                st.error("Ad Soyad alanı zorunludur!")
 
     if 'wa_msg' in st.session_state:
         msg = urllib.parse.quote(st.session_state['wa_msg'])
         st.link_button("🟢 WHATSAPP İLE BİLDİR", f"https://api.whatsapp.com/send?text={msg}", use_container_width=True)
 
 else:
+    # --- YÖNETİCİ PANELİ (Mevcut hali korundu) ---
     if st.sidebar.text_input("Şifre", type="password") == "2020":
         df, ad_sutunu = yukle()
         t = st.tabs(["📊 Karne", "👤 Sicil", "📝 Manuel", "⏰ Geç Kalma", "📅 Yıllık İzin", "🗑️ Liste & Sil"])
@@ -104,61 +109,53 @@ else:
         with t[0]: # Karne
             if not df.empty and 'Ay' in df.columns:
                 ay_secim = st.selectbox("Ay Seç", sorted(df['Ay'].dropna().unique(), reverse=True))
-                # Hatalı olan satırları temizleyip doğrudan sayısal veriyi gösteriyoruz
                 karne_data = df[df['Ay']==ay_secim].groupby([ad_sutunu,'Tür'])[['G','S']].sum()
                 st.dataframe(karne_data, use_container_width=True)
-                
                 csv = karne_data.to_csv(index=True, sep=';', encoding='utf-8-sig').encode('utf-8-sig')
-                st.download_button(label="📥 Karneyi İndir (Excel)", data=csv, file_name=f"karne_{ay_secim}.csv")
+                st.download_button(label="📥 Karneyi İndir", data=csv, file_name=f"karne_{ay_secim}.csv")
             else: st.info("Veri yok.")
 
         with t[1]: # Sicil
             st.subheader("👤 Personel Sicili")
-            p_sicil = st.selectbox("Personel", p_listesi)
-            if not df.empty:
-                st.dataframe(df[df[ad_sutunu]==p_sicil][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
+            ps = st.selectbox("Personel", p_listesi)
+            if not df.empty: st.dataframe(df[df[ad_sutunu]==ps][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
 
         with t[2]: # Manuel
-            st.subheader("📝 Manuel Kayıt")
             with st.form("m_f"):
                 m_ad, m_tp = st.selectbox("Personel", p_listesi), st.selectbox("Tip", ["Tam Gün", "Saatlik"])
-                m_tr, m_tarih = st.selectbox("Tür", IZ[:-1]), st.date_input("Tarih")
-                ms1, ms2 = st.time_input("Çıkış Saati"), st.time_input("Dönüş Saati")
-                m_db = st.date_input("İş Başı Tarihi")
-                if st.form_submit_button("KAYDI EKLE"):
-                    mb, md = (f"{m_tarih.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}", f"{m_tarih.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}") if m_tp == "Saatlik" else (m_tarih.strftime(F_TARIH), m_db.strftime(F_TARIH))
+                m_tr, m_tar = st.selectbox("Tür", IZ[:-1]), st.date_input("Tarih")
+                ms1, ms2 = st.time_input("Çıkış"), st.time_input("Dönüş")
+                m_db = st.date_input("Dönüş Tarihi")
+                if st.form_submit_button("MANUEL EKLE"):
+                    mb, md = (f"{m_tar.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}", f"{m_tar.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}") if m_tp == "Saatlik" else (m_tar.strftime(F_TARIH), m_db.strftime(F_TARIH))
                     requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":m_ad,"brans":"Y","tur":f"{m_tr} ({m_tp})","bas":mb,"bit":md}))
-                    st.success("Kayıt eklendi.")
+                    st.success("Kaydedildi.")
 
         with t[3]: # Geç Kalma
-            st.subheader("⏰ Geç Kalma Girişi")
             with st.form("g_f"):
-                g_ad = st.selectbox("Personel", p_listesi)
-                g_tar = st.date_input("Tarih")
-                g_dak = st.slider("Gecikme (Dakika)", 1, 60, 15)
+                g_ad = st.selectbox("Personel", p_listesi); g_t = st.date_input("Tarih"); g_d = st.slider("Dakika", 1, 60, 15)
                 if st.form_submit_button("GEÇ KALMA KAYDET"):
-                    g_bas, g_bit = f"{g_tar.strftime(F_TARIH)} 09:00", f"{g_tar.strftime(F_TARIH)} 09:{g_dak:02d}"
-                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":g_ad,"brans":"Y","tur":"Geç Kalma","bas":g_bas,"bit":g_bit}))
-                    st.success("Geç kalma kaydı yapıldı.")
+                    gb, gd = f"{g_t.strftime(F_TARIH)} 09:00", f"{g_t.strftime(F_TARIH)} 09:{g_d:02d}"
+                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":g_ad,"brans":"Y","tur":"Geç Kalma","bas":gb,"bit":gd}))
+                    st.success("Kaydedildi.")
 
         with t[4]: # Yıllık İzin
-            py = st.selectbox("Hakediş Sorgula", p_listesi, key="yil_sor")
+            py = st.selectbox("Hakediş", p_listesi)
             varsay_t = datetime.strptime(PERSONEL_GIRISLERI.get(py, "2024-01-01"), "%Y-%m-%d")
-            gt = st.date_input("İşe Giriş Tarihi", value=varsay_t)
+            gt = st.date_input("Giriş", value=varsay_t)
             kidem = datetime.now().year - gt.year - ((datetime.now().month, datetime.now().day) < (gt.month, gt.day))
             hk, ku = hakedis_bul(max(0, kidem)), (df[(df[ad_sutunu]==py) & (df['Tür'].str.contains("Yıllık"))]['G'].sum() if not df.empty else 0)
             c1, c2, c3 = st.columns(3)
-            c1.metric("Toplam Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
+            c1.metric("Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
 
         with t[5]: # Liste & Sil
             if not df.empty:
                 df_sil = df.copy(); df_sil.insert(0, "SİLME_ID", df_sil.index + 2)
                 st.dataframe(df_sil.tail(30), use_container_width=True)
-                csv_full = df.to_csv(index=False, sep=';', encoding='utf-8-sig').encode('utf-8-sig')
-                st.download_button(label="📥 Tüm Listeyi Excel Olarak İndir", data=csv_full, file_name="izin_yedek.csv")
-                st.divider()
-                sid = st.number_input("Silinecek Satır No:", min_value=2, step=1)
-                if st.button("❌ SEÇİLİ KAYDI SİL"):
+                csv_f = df.to_csv(index=False, sep=';', encoding='utf-8-sig').encode('utf-8-sig')
+                st.download_button(label="📥 Listeyi İndir", data=csv_f, file_name="liste.csv")
+                sid = st.number_input("Silinecek ID:", min_value=2, step=1)
+                if st.button("❌ SİL"):
                     requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sid)}))
-                    st.success(f"{sid} numaralı satır silindi. Güncelleme için sayfayı yenileyin.")
-    else: st.warning("Yönetici şifresi gerekli.")
+                    st.success("Silindi.")
+    else: st.warning("Şifre giriniz.")
