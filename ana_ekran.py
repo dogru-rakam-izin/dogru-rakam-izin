@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 import urllib.parse
 
-# --- GÜNCEL AYARLAR ---
+# --- AYARLAR ---
 URL = "https://script.google.com/macros/s/AKfycbwp1CNfE5Lp9kKbFF99MvwX3PAwO2Y85NAWu5SCdj5TnhNnan7r-VBDEW9ONF9OqkuV/exec"
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
@@ -13,7 +13,7 @@ LOGO_URL = "https://i.ibb.co/8LG243NJ/LOGO.png"
 
 st.set_page_config(page_title="Doğru Rakam İzin Paneli", layout="wide", page_icon=LOGO_URL)
 
-# --- AYARLAR VE ÇEVİRİLER ---
+# --- FORMAT VE ÇEVİRİLER ---
 F_TARIH, F_SAAT, F_TAM = '%d/%m/%Y', '%H:%M', '%d/%m/%Y %H:%M'
 TR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
 IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim", "Geç Kalma"]
@@ -39,7 +39,7 @@ def hakedis_bul(yil):
 def yukle():
     try:
         df = pd.read_csv(CSV)
-        if df.empty: return pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
+        if df.empty: return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
         df.columns = [str(c).strip() for c in df.columns]
         ad_col = next((c for c in df.columns if "AD" in c.upper()), df.columns[2])
         if "Durum" not in df.columns: df["Durum"] = "Onaylandı"
@@ -65,8 +65,8 @@ def yukle():
             df_onayli['G'], df_onayli['S'] = res[0].astype(float), res[1].astype(float)
             df_onayli['T'] = pd.to_datetime(df_onayli['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
             df_onayli['Ay'] = df_onayli['T'].dt.strftime('%B').map(TR) + " " + df_onayli['T'].dt.strftime('%Y')
-        return df_bekleyen, df_onayli, ad_col
-    except: return pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
+        return df, df_bekleyen, df_onayli, ad_col
+    except: return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
 
 st.sidebar.image(LOGO_URL, width=150)
 menu = st.sidebar.radio("📌 MENÜ", ["👤 PERSONEL GİRİŞİ", "🔐 YÖNETİCİ PANELİ"])
@@ -90,23 +90,23 @@ if menu == "👤 PERSONEL GİRİŞİ":
 
 else:
     if st.sidebar.text_input("Şifre", type="password") == "2020":
-        df_b, df_o, ad_c = yukle()
+        df_all, df_b, df_o, ad_c = yukle()
         p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
-        t = st.tabs(["🔔 Onay Bekleyenler", "📊 Karne", "👤 Sicil", "📝 Manuel Giriş", "⏰ Geç Kalma", "📅 Yıllık İzin"])
+        t = st.tabs(["🔔 Onay Bekleyenler", "📊 Karne", "👤 Sicil", "📝 Manuel Giriş", "⏰ Geç Kalma", "📅 Yıllık İzin", "🗑️ Liste ve Silme"])
         
         with t[0]: # Onay Bekleyenler
             if not df_b.empty:
                 df_b_goster = df_b.copy(); df_b_goster.insert(0, "ID", df_b_goster.index + 2)
                 st.table(df_b_goster[["ID", ad_c, "Tür", "Başlangıç"]])
-                c1, c2 = st.columns(2); onay_id = c1.number_input("ID Seç:", min_value=2, step=1)
-                if c2.button("✅ ONAYLA"):
+                c1, c2 = st.columns(2); onay_id = c1.number_input("İşlem Yapılacak ID:", min_value=2, step=1, key="onay_id")
+                if c2.button("✅ SEÇİLENİ ONAYLA"):
                     requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(onay_id)}))
                     pers_ad = df_b_goster[df_b_goster["ID"] == onay_id][ad_c].values[0]
-                    st.session_state['adm_wa'] = f"✅ *SAYIN {pers_ad},*\n*İZİN TALEBİNİZ ONAYLANMIŞTIR.*\n📝 Programı düzenleyip dilekçenizi iletmeyi unutmayınız."
+                    st.session_state['adm_wa'] = f"✅ *SAYIN {pers_ad},*\n\n*İZİN TALEBİNİZ ONAYLANMIŞTIR.*\n\n📝 Programı düzenleyip dilekçenizi iletmeyi unutmayınız."
                     st.success(f"{pers_ad} onaylandı.")
                 if 'adm_wa' in st.session_state:
                     st.link_button("🟢 ONAY MESAJI GÖNDER", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['adm_wa'])}", use_container_width=True)
-            else: st.success("Bekleyen yok.")
+            else: st.success("Bekleyen talep yok.")
 
         with t[1]: # Karne
             if not df_o.empty:
@@ -141,3 +141,17 @@ else:
             ku = (df_o[(df_o[ad_c]==py) & (df_o['Tür'].str.contains("Yıllık"))]['G'].sum() if not df_o.empty else 0)
             c1, c2, c3 = st.columns(3)
             c1.metric("Toplam Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
+
+        with t[6]: # 🗑️ Liste ve Silme (GERİ GELDİ)
+            st.subheader("🗑️ Kayıt Yönetimi (Silme)")
+            if not df_all.empty:
+                df_list = df_all.copy()
+                df_list.insert(0, "ID", df_list.index + 2)
+                st.dataframe(df_list, use_container_width=True)
+                
+                c1, c2 = st.columns(2)
+                sil_id = c1.number_input("Silinecek ID (Satır No):", min_value=2, step=1, key="sil_id")
+                if c2.button("❌ SEÇİLEN KAYDI SİL"):
+                    requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sil_id)}))
+                    st.error(f"{sil_id} numaralı satır silindi. Lütfen sayfayı yenileyin.")
+            else: st.warning("Liste boş.")
