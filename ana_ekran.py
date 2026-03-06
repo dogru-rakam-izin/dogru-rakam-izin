@@ -13,10 +13,12 @@ LOGO_URL = "https://i.ibb.co/8LG243NJ/LOGO.png"
 
 st.set_page_config(page_title="Doğru Rakam İzin Paneli", layout="wide", page_icon=LOGO_URL)
 
+# --- FORMAT VE ÇEVİRİLER ---
 F_TARIH, F_SAAT, F_TAM = '%d/%m/%Y', '%H:%M', '%d/%m/%Y %H:%M'
 TR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
 IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim", "Geç Kalma"]
 
+# --- PERSONEL VERİTABANI ---
 PERSONEL_GIRISLERI = {
     "ARİF EMRE YILDIZ": "2024-10-09", "AYŞE KOLBAŞ": "2022-03-04", "AYŞE GÜLLÜ ÇIRAY": "2023-04-27", 
     "BURAK ÖZAYDIN": "2025-09-11", "BUSE MEYRİLİ": "2025-02-07", "ERSİN KALSEN": "2023-06-06",
@@ -65,7 +67,8 @@ def yukle():
         return df, df_bekleyen, df_onayli, ad_col
     except: return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
 
-st.sidebar.image(LOGO_URL, width=150)
+# --- LOGO BURADA BÜYÜTÜLDÜ (250px) ---
+st.sidebar.image(LOGO_URL, width=250)
 menu = st.sidebar.radio("📌 MENÜ", ["👤 PERSONEL GİRİŞİ", "🔐 YÖNETİCİ PANELİ"])
 
 if menu == "👤 PERSONEL GİRİŞİ":
@@ -105,7 +108,7 @@ else:
                     st.link_button("🟢 ONAY MESAJI GÖNDER", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_msg'])}", use_container_width=True)
             else: st.success("Bekleyen yok.")
 
-        with t[3]: # Manuel Giriş (WhatsApp Eklendi)
+        with t[3]: # Manuel Giriş
             with st.form("m_form"):
                 m_ad = st.selectbox("Personel", p_listesi); m_tr = st.selectbox("Tür", IZ[:-1])
                 m_t1 = st.date_input("Başlangıç"); m_t2 = st.date_input("Dönüş")
@@ -116,7 +119,7 @@ else:
             if 'wa_msg' in st.session_state and menu == "🔐 YÖNETİCİ PANELİ":
                 st.link_button("🟢 BİLGİ MESAJI GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_msg'])}", use_container_width=True)
 
-        with t[4]: # Geç Kalma (WhatsApp Eklendi)
+        with t[4]: # Geç Kalma
             with st.form("g_form"):
                 g_ad = st.selectbox("Personel Seç", p_listesi); g_t = st.date_input("Tarih"); g_d = st.slider("Dakika", 1, 60, 15)
                 if st.form_submit_button("GEÇ KALMA İŞLE"):
