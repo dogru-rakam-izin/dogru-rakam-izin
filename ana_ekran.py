@@ -13,6 +13,12 @@ LOGO_URL = "https://i.ibb.co/8LG243NJ/LOGO.png"
 
 st.set_page_config(page_title="Doğru Rakam İzin Paneli", layout="wide", page_icon=LOGO_URL)
 
+# --- LOGO YERLEŞİMİ (SAYFA BAŞINA ORTALI) ---
+# Sidebar'dan silindi, ana sayfanın en üstüne 3 sütunla ortalandı
+c1, c2, c3 = st.columns([1, 1, 1])
+with c2:
+    st.image(LOGO_URL, width=300)
+
 F_TARIH, F_SAAT, F_TAM = '%d/%m/%Y', '%H:%M', '%d/%m/%Y %H:%M'
 TR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
 IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim", "Geç Kalma"]
@@ -66,7 +72,6 @@ def yukle():
         return df, df_bekleyen, df_onayli, ad_col
     except: return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
 
-st.sidebar.image(LOGO_URL, width=250)
 menu = st.sidebar.radio("📌 MENÜ", ["👤 PERSONEL GİRİŞİ", "🔐 YÖNETİCİ PANELİ"])
 
 if menu == "👤 PERSONEL GİRİŞİ":
@@ -104,23 +109,20 @@ else:
                 if c2.button("✅ SEÇİLENİ ONAYLA"):
                     secim = df_b_goster[df_b_goster["ID"] == onay_id]
                     if not secim.empty:
-                        # Bilgileri çek
                         pers_ad = secim[ad_c].values[0]
                         izin_turu = secim["Tür"].values[0]
                         baslangic = secim["Başlangıç"].values[0]
                         donus = secim["Dönüş"].values[0]
                         
-                        # Google Sheets Onayla
                         requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(onay_id)}))
                         
-                        # WhatsApp Mesajını Hazırla (MAHİYET VE TARİH EKLENDİ)
                         msg = f"✅ *SAYIN {pers_ad},*\n\n"
                         msg += f"🗓 *{baslangic} - {donus}* tarihlerindeki\n"
                         msg += f"📋 *{izin_turu}* talebiniz onaylanmıştır.\n\n"
                         msg += "📝 Programı düzenleyip dilekçenizi yönetime iletmeyi unutmayınız."
                         
                         st.session_state['wa_msg'] = msg
-                        st.success(f"{pers_ad} için onay verildi!")
+                        st.success(f"{pers_ad} onaylandı!")
                     else:
                         st.error("Hatalı ID!")
                 
@@ -128,7 +130,7 @@ else:
                     st.link_button("🟢 ONAY MESAJINI PERSONELE GÖNDER", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_msg'])}", use_container_width=True)
             else: st.success("Bekleyen yok.")
 
-        # DİĞER SEKMELER AYNI KALIYOR
+        # DİĞER SEKMELER (GİZLENEN ÖZELLİKLER DAHİL)
         with t[1]: # Karne
             if not df_o.empty:
                 ay_sec = st.selectbox("Ay Seç", sorted(df_o['Ay'].dropna().unique(), reverse=True))
@@ -136,7 +138,7 @@ else:
         with t[2]: # Sicil
             ps = st.selectbox("Personel", p_listesi)
             if not df_o.empty: st.dataframe(df_o[df_o[ad_c]==ps][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
-        with t[3]: # Manuel
+        with t[3]: # Manuel Giriş
             with st.form("m_form"):
                 m_ad = st.selectbox("Personel", p_listesi); m_tr = st.selectbox("Tür", IZ[:-1])
                 m_t1 = st.date_input("Başlangıç"); m_t2 = st.date_input("Dönüş")
