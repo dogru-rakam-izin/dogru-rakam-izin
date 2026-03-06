@@ -38,19 +38,18 @@ def hakedis_bul(yil):
 def yukle():
     try:
         df = pd.read_csv(CSV)
-        if df.empty: return pd.DataFrame(), pd.DataFrame(), "Ad Soyad", None
+        if df.empty: return pd.DataFrame(), pd.DataFrame(), "Ad Soyad", "Durum"
         df.columns = [str(c).strip() for c in df.columns]
         ad_col = next((c for c in df.columns if "AD" in c.upper()), "Ad Soyad")
-        durum_col = next((c for c in df.columns if "DURUM" in c.upper()), None)
+        durum_col = next((c for c in df.columns if "DURUM" in c.upper()), "Durum")
+        
+        if durum_col not in df.columns:
+            df[durum_col] = "Onaylandı" # Sütun yoksa herkesi onaylı say (Eskiler gelsin diye)
+        
         df[ad_col] = df[ad_col].astype(str).str.strip().str.upper()
         
-        # DURUM sütunu yoksa oluştur (Eskilerin kaybolmaması için)
-        if durum_col is None:
-            df["Durum"] = "Onaylandı"
-            durum_col = "Durum"
-        
-        # Karneyi ve Sicili sadece 'Onaylandı' olanlarla doldur
-        df_onayli = df[df[durum_col].astype(str).str.contains("Onaylandı", na=False)].copy()
+        # Sadece Onaylananlar Karneye/Sicile
+        df_onayli = df[df[durum_col].astype(str).str.contains("Onaylandı", case=False, na=False)].copy()
         
         def h(r):
             try:
@@ -70,7 +69,7 @@ def yukle():
             df_onayli['Ay'] = df_onayli['T'].dt.strftime('%B').map(TR) + " " + df_onayli['T'].dt.strftime('%Y')
         
         return df, df_onayli, ad_col, durum_col
-    except: return pd.DataFrame(), pd.DataFrame(), "Ad Soyad", None
+    except: return pd.DataFrame(), pd.DataFrame(), "Ad Soyad", "Durum"
 
 st.markdown(f"<style>[data-testid='stSidebarNav'] {{ background-image: url({LOGO_URL}); background-repeat: no-repeat; padding-top: 140px; background-position: center 20px; background-size: 150px auto; }} .main-title {{ color: #CC0000; font-size: 38px; font-weight: bold; text-align: center; }} div.stButton > button {{ background-color: #25D366 !important; color: white !important; font-weight: bold; }} </style>", unsafe_allow_html=True)
 
@@ -84,7 +83,7 @@ if m == "👤 PERSONEL İZİN TALEBİ":
     with st.form("p_f"):
         t1, t2 = st.selectbox("İzin Türü", IZ[:-1]), st.date_input("İzin Başlangıç")
         if tp == "Saatlik":
-            s1, s2 = st.time_input("Çıkış"), st.time_input("Dönüş")
+            s1, s2 = st.time_input("Çıkış Saati"), st.time_input("Dönüş Saati")
             b, d = f"{t2.strftime(F_TARIH)} {s1.strftime(F_SAAT)}", f"{t2.strftime(F_TARIH)} {s2.strftime(F_SAAT)}"
             detay = f"⏰ *Saat:* {s1.strftime(F_SAAT)} - {s2.strftime(F_SAAT)}"
         else:
@@ -94,42 +93,60 @@ if m == "👤 PERSONEL İZİN TALEBİ":
         
         if st.form_submit_button("TALEBİ GÖNDER"):
             if ad:
-                # Durum sütunu için "Onay Bekliyor" ekliyoruz
                 requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":tc,"ad":ad,"brans":"P","tur":f"{t1} ({tp})","bas":b,"bit":d, "durum": "Onay Bekliyor"}))
                 st.session_state['wa_msg'] = f"🔔 *İİZİN TALEP BİLDİRİMİ*\n👤 *Personel:* {ad}\n📋 *Tür:* {t1} ({tp})\n{detay}\n\n📝 *Not:* İzniniz onaylandığında; programı düzenleyip dilekçenizi iletmeyi unutmayınız."
-                st.success("Talebiniz iletildi. WhatsApp ile gruba bildirmeyi unutmayın.")
+                st.success("Talep gönderildi. WhatsApp ile gruba bildirmeyi unutmayın.")
 
     if 'wa_msg' in st.session_state:
         msg = urllib.parse.quote(st.session_state['wa_msg'])
         st.link_button("🟢 WHATSAPP İLE GRUBA YAZ", f"https://api.whatsapp.com/send?text={msg}", use_container_width=True)
 
 else:
-    if st.sidebar.text_input("Şifre", type="password") == "2020":
+    if st.sidebar.text_input("Yönetici Şifresi", type="password") == "2020":
         df_all, df_onayli, ad_sutunu, durum_sutunu = yukle()
         t = st.tabs(["🔔 Onay Bekleyenler", "📊 Karne", "👤 Sicil", "📝 Manuel", "⏰ Geç Kalma", "📅 Yıllık İzin", "🗑️ Liste"])
         p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
 
-        with t[0]: # ONAY BEKLEYENLER
+        with t[0]: # Onay Bekleyenler
             st.subheader("Onay Bekleyen İstekler")
             if not df_all.empty:
                 bekleyen = df_all[df_all[durum_sutunu] == "Onay Bekliyor"].copy()
                 if not bekleyen.empty:
                     bekleyen.insert(0, "SATIR_NO", bekleyen.index + 2)
                     st.dataframe(bekleyen[["SATIR_NO", ad_sutunu, "Tür", "Başlangıç", "Dönüş"]], use_container_width=True)
-                    st.info("Onaylamak için Google Sheets üzerinden bu satırın Durumunu 'Onaylandı' yapınız.")
-                else: st.success("Bekleyen istek yok.")
+                    st.info("Onaylamak için Sheets dosyasında 'Durum' sütununu 'Onaylandı' yapın.")
+                else: st.success("Bekleyen talep yok.")
 
         with t[1]: # Karne
             if not df_onayli.empty:
                 ay_secim = st.selectbox("Ay Seç", sorted(df_onayli['Ay'].dropna().unique(), reverse=True))
                 st.dataframe(df_onayli[df_onayli['Ay']==ay_secim].groupby([ad_sutunu,'Tür'])[['G','S']].sum())
-            else: st.warning("Henüz onaylanmış kayıt yok.")
+            else: st.warning("Onaylanmış veri yok.")
 
-        with t[2]: # Sicil
-            ps = st.selectbox("Personel", p_listesi)
-            if not df_onayli.empty:
-                st.dataframe(df_onayli[df_onayli[ad_sutunu]==ps][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
+        with t[3]: # Manuel
+            with st.form("m_f"):
+                m_ad = st.selectbox("Personel", p_listesi)
+                m_tr = st.selectbox("Tür", IZ[:-1])
+                m_tar = st.date_input("İzin Günü")
+                m_db = st.date_input("Dönüş Günü")
+                if st.form_submit_button("MANUEL EKLE (DİREKT ONAYLI)"):
+                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":m_ad,"brans":"Y","tur":f"{m_tr} (Tam Gün)","bas":m_tar.strftime(F_TARIH),"bit":m_db.strftime(F_TARIH), "durum": "Onaylandı"}))
+                    st.success("Kayıt başarıyla eklendi ve onaylandı.")
 
-        with t[6]: # Liste (Tüm liste burada görünür)
-            st.subheader("Tüm Kayıtlar (Onaylı/Bekleyen)")
+        with t[4]: # Geç Kalma
+            with st.form("g_f"):
+                g_ad = st.selectbox("Personel", p_listesi); g_t = st.date_input("Tarih"); g_d = st.slider("Dakika", 1, 60, 15)
+                if st.form_submit_button("GEÇ KALMA KAYDET (DİREKT ONAYLI)"):
+                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"0","ad":g_ad,"brans":"Y","tur":"Geç Kalma","bas":f"{g_t.strftime(F_TARIH)} 09:00","bit":f"{g_t.strftime(F_TARIH)} 09:{g_d:02d}", "durum": "Onaylandı"}))
+                    st.success("Geç kalma işlendi.")
+
+        with t[5]: # Yıllık İzin
+            py = st.selectbox("Hakediş", p_listesi)
+            gt = datetime.strptime(PERSONEL_GIRISLERI.get(py, "2024-01-01"), "%Y-%m-%d")
+            kidem = datetime.now().year - gt.year - ((datetime.now().month, datetime.now().day) < (gt.month, gt.day))
+            hk, ku = hakedis_bul(max(0, kidem)), (df_onayli[(df_onayli[ad_sutunu]==py) & (df_onayli['Tür'].str.contains("Yıllık"))]['G'].sum() if not df_onayli.empty else 0)
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Toplam Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
+
+        with t[6]: # Liste
             st.dataframe(df_all, use_container_width=True)
