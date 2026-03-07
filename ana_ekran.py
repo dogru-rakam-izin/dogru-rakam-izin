@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 import urllib.parse
 
-# --- AYARLAR (MEVCUT AYARLARINIZ TAMAMEN KORUNDU) ---
+# --- AYARLAR (HİÇBİRİ DEĞİŞTİRİLMEDİ) ---
 URL = "https://script.google.com/macros/s/AKfycbwp1CNfE5Lp9kKbFF99MvwX3PAwO2Y85NAWu5SCdj5TnhNnan7r-VBDEW9ONF9OqkuV/exec"
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
@@ -13,7 +13,7 @@ LOGO_URL = "https://i.ibb.co/8LG243NJ/LOGO.png"
 
 st.set_page_config(page_title="Doğru Rakam İzin Paneli", layout="wide", page_icon=LOGO_URL)
 
-# --- LOGO VE TASARIM ---
+# --- LOGO ---
 st.markdown(f"<div style='text-align: center;'><img src='{LOGO_URL}' width='350'></div>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -75,38 +75,43 @@ menu = st.sidebar.radio("📌 MENÜ", ["👤 PERSONEL GİRİŞİ", "🔐 YÖNET�
 
 if menu == "👤 PERSONEL GİRİŞİ":
     st.markdown('<h2 style="text-align:center; color:#CC0000;">İZİN TALEP FORMU</h2>', unsafe_allow_html=True)
-    with st.form("p_form", clear_on_submit=False):
-        p_ad = st.selectbox("Ad Soyad Seçiniz", p_listesi).upper()
-        p_tur = st.selectbox("İzin Türü", IZ)
-        p_tp = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], horizontal=True)
-        p_t1 = st.date_input("İzin Günü / Başlangıç Tarihi")
-        
-        # --- SAAT KUTULARI (DÜZELTİLEN KISIM) ---
-        if p_tp == "Saatlik":
-            c1, c2 = st.columns(2)
-            p_s1 = c1.time_input("Çıkış Saati", value=datetime.strptime("09:00", "%H:%M").time())
-            p_s2 = c2.time_input("Dönüş Saati", value=datetime.strptime("10:00", "%H:%M").time())
-            p_bas_v = f"{p_t1.strftime(F_TARIH)} {p_s1.strftime(F_SAAT)}"
-            p_bit_v = f"{p_t1.strftime(F_TARIH)} {p_s2.strftime(F_SAAT)}"
-        else:
-            p_dn = st.date_input("İş Başı Tarihi (Dönüş)")
-            p_bas_v = p_t1.strftime(F_TARIH)
-            p_bit_v = p_dn.strftime(F_TARIH)
-        
-        if st.form_submit_button("TALEBİ SİSTEME GÖNDER"):
-            requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":p_ad,"tur":f"{p_tur} ({p_tp})","bas":p_bas_v,"bit":p_bit_v, "durum": "Onay Bekliyor"}))
-            st.session_state['wa_p_talep'] = f"📄 *YENİ İZİN TALEBİ*\n👤 *Personel:* {p_ad}\n📋 *Tür:* {p_tur} ({p_tp})\n🗓 *Zaman:* {p_bas_v} - {p_bit_v}\n\n*Onayınızı bekliyorum.*"
-            st.success(f"Talebiniz iletildi: {p_bas_v}")
+    
+    # KESİN ÇÖZÜM: Seçimleri formun dışına aldık, böylece tıklandığı an sayfa yenilenir ve saatler görünür.
+    p_ad = st.selectbox("Ad Soyad Seçiniz", p_listesi).upper()
+    p_tur = st.selectbox("İzin Türü", IZ)
+    p_tp = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], horizontal=True)
+    p_t1 = st.date_input("İzin Günü / Başlangıç Tarihi")
+    
+    p_bas_final = ""
+    p_bit_final = ""
+
+    if p_tp == "Saatlik":
+        c1, c2 = st.columns(2)
+        p_s1 = c1.time_input("Çıkış Saati", value=datetime.strptime("09:00", "%H:%M").time())
+        p_s2 = c2.time_input("Dönüş Saati", value=datetime.strptime("10:00", "%H:%M").time())
+        p_bas_final = f"{p_t1.strftime(F_TARIH)} {p_s1.strftime(F_SAAT)}"
+        p_bit_final = f"{p_t1.strftime(F_TARIH)} {p_s2.strftime(F_SAAT)}"
+    else:
+        p_dn = st.date_input("İş Başı Tarihi (Dönüş)")
+        p_bas_final = p_t1.strftime(F_TARIH)
+        p_bit_final = p_dn.strftime(F_TARIH)
+
+    # Gönder butonu için küçük bir form
+    with st.form("gonder_form", clear_on_submit=False):
+        if st.form_submit_button("TALEBİ SİSTEME GÖNDER", use_container_width=True):
+            requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":p_ad,"tur":f"{p_tur} ({p_tp})","bas":p_bas_final,"bit":p_bit_final, "durum": "Onay Bekliyor"}))
+            st.session_state['wa_p_talep'] = f"📄 *YENİ İZİN TALEBİ*\n👤 *Personel:* {p_ad}\n📋 *Tür:* {p_tur} ({p_tp})\n🗓 *Zaman:* {p_bas_final} - {p_bit_final}\n\n*Onayınızı bekliyorum.*"
+            st.success("Talebiniz iletildi. Lütfen WhatsApp butonuna basınız.")
 
     if 'wa_p_talep' in st.session_state:
         st.link_button("🟢 YÖNETİCİYE WHATSAPP'TAN BİLDİR", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_p_talep'])}", use_container_width=True)
 
 else:
-    # --- YÖNETİCİ PANELİ (MEVCUT YAPI KORUNDU) ---
+    # --- YÖNETİCİ PANELİ (MEVCUT KODUNUZ) ---
     if st.sidebar.text_input("Şifre", type="password") == "2020":
         t = st.tabs(["🔔 Onay Bekleyenler", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel Giriş", "⏰ Geç Kalma", "🗑️ Liste/Sil"])
         
-        with t[0]: # Onay Bekleyenler
+        with t[0]: # Onay
             if not df_b.empty:
                 df_b_g = df_b.copy(); df_b_g.insert(0, "ID", df_b_g.index + 2)
                 st.table(df_b_g[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
@@ -160,7 +165,7 @@ else:
             if 'wa_adm_gec' in st.session_state:
                 st.link_button("🟢 GEÇ KALMA BİLGİSİ GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_adm_gec'])}", use_container_width=True)
 
-        with t[6]: # Liste ve Silme
+        with t[6]: # Sil
             if not df_all.empty:
                 df_l = df_all.copy(); df_l.insert(0, "ID", df_l.index + 2); st.dataframe(df_l, use_container_width=True)
                 sid = st.number_input("Sil ID:", min_value=2, step=1, key="adm_sil")
