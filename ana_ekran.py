@@ -1,5 +1,5 @@
 import streamlit as st
-import pd as pd
+import pandas as pd  # <--- Hata buradaydı, düzeltildi.
 import requests
 import json
 from datetime import datetime
@@ -139,7 +139,7 @@ else:
             c1, c2, c3 = st.columns(3)
             c1.metric("Toplam Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
 
-        with t[4]: # MANUEL GİRİŞ (DÜZELTİLDİ)
+        with t[4]: # MANUEL GİRİŞ
             ma = st.selectbox("Personel", p_listesi, key="m_ad")
             mt = st.selectbox("Tür", IZ, key="m_tur")
             ms = st.radio("Süre", ["Tam Gün", "Saatlik"], horizontal=True, key="m_süre")
