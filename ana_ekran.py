@@ -81,15 +81,16 @@ if menu == "👤 PERSONEL GİRİŞİ":
         p_tp = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], horizontal=True)
         p_t1 = st.date_input("İzin Günü / Başlangıç Tarihi")
         
-        # --- DÜZELTİLEN SAAT BÖLÜMÜ ---
+        # --- SAAT KUTULARINI GÖSTEREN KRİTİK ALAN ---
         if p_tp == "Saatlik":
+            # Saatlik seçildiğinde saat kutularını göster
             c1, c2 = st.columns(2)
             p_s1 = c1.time_input("Çıkış Saati", value=datetime.strptime("09:00", "%H:%M").time())
-            p_s2 = c2.time_input("Dönüş Saati", value=datetime.strptime("10:00", "%H:%M").time())
-            # Tarih ve saati birleştiriyoruz
+            p_s2 = c2.time_input("Dönüş Saati", value=datetime.strptime("17:00", "%H:%M").time())
             p_bas_val = f"{p_t1.strftime(F_TARIH)} {p_s1.strftime(F_SAAT)}"
             p_bit_val = f"{p_t1.strftime(F_TARIH)} {p_s2.strftime(F_SAAT)}"
         else:
+            # Tam gün seçildiğinde dönüş tarihini göster
             p_dn = st.date_input("İş Başı Tarihi (Dönüş)")
             p_bas_val = p_t1.strftime(F_TARIH)
             p_bit_val = p_dn.strftime(F_TARIH)
@@ -97,13 +98,13 @@ if menu == "👤 PERSONEL GİRİŞİ":
         if st.form_submit_button("TALEBİ SİSTEME GÖNDER"):
             requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":p_ad,"tur":f"{p_tur} ({p_tp})","bas":p_bas_val,"bit":p_bit_val, "durum": "Onay Bekliyor"}))
             st.session_state['wa_p_talep'] = f"📄 *YENİ İZİN TALEBİ*\n👤 *Personel:* {p_ad}\n📋 *Tür:* {p_tur} ({p_tp})\n🗓 *Zaman:* {p_bas_val} - {p_bit_val}\n\n*Onayınızı bekliyorum.*"
-            st.success("Talebiniz iletildi. Lütfen aşağıdaki butonla WhatsApp'tan bildirin.")
+            st.success(f"Kayıt İletildi: {p_bas_val} - {p_bit_val}")
 
     if 'wa_p_talep' in st.session_state:
         st.link_button("🟢 YÖNETİCİYE WHATSAPP'TAN BİLDİR", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_p_talep'])}", use_container_width=True)
 
 else:
-    # --- YÖNETİCİ PANELİ (TAMAMEN KORUNDU) ---
+    # --- YÖNETİCİ PANELİ (MEVCUT KODUNUZ) ---
     if st.sidebar.text_input("Şifre", type="password") == "2020":
         t = st.tabs(["🔔 Onay Bekleyenler", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel Giriş", "⏰ Geç Kalma", "🗑️ Liste/Sil"])
         
