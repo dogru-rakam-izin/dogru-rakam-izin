@@ -90,7 +90,7 @@ else:
                     if not secim.empty:
                         p_ad, p_tur, p_bas, p_bit = secim[ad_c].values[0], secim["Tür"].values[0], secim["Başlangıç"].values[0], secim["Dönüş"].values[0]
                         requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(onay_id)}))
-                        st.session_state['wa_onay'] = f"✅ *SAYIN {p_ad},*\n\n🗓 *{p_bas} - {p_bit}* tarihlerindeki\n📋 *{p_tur}* talebiniz onaylanmıştır.\n\n📝 Programı düzenleyip dilekçenizi iletmeyi unutmayınız."
+                        st.session_state['wa_onay'] = f"✅ *SAYIN {p_ad},*\n\n🗓 *{p_bas} - {p_bit}* tarihlerindeki\n📋 *{p_tur}* talebiniz alınmıştır.\n\n📝 Programı düzenleyip dilekçenizi iletmeyi unutmayınız."
                         st.success("Onaylandı!")
                 if 'wa_onay' in st.session_state:
                     st.link_button("🟢 ONAY MESAJINI GÖNDER", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_onay'])}", use_container_width=True)
@@ -133,3 +133,4 @@ else:
                 if c2.button("❌ SİL"):
                     requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sil_id)}))
                     st.error("Silindi.")
+
