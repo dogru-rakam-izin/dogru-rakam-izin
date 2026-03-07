@@ -13,10 +13,10 @@ LOGO_URL = "https://i.ibb.co/8LG243NJ/LOGO.png"
 
 st.set_page_config(page_title="Doğru Rakam İzin Paneli", layout="wide", page_icon=LOGO_URL)
 
-# --- LOGO YERLEŞİMİ ---
-c1, c2, c3 = st.columns([1, 1, 1])
-with c2:
-    st.image(LOGO_URL, width=350)
+# --- LOGO BURADA (En Üstte ve Ortalı) ---
+# Eğer görünmezse width değerini 300'e çekebilirsiniz.
+st.markdown(f"<div style='text-align: center;'><img src='{LOGO_URL}' width='350'></div>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True) # Biraz boşluk
 
 F_TARIH, F_SAAT, F_TAM = '%d/%m/%Y', '%H:%M', '%d/%m/%Y %H:%M'
 TR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
@@ -33,24 +33,17 @@ PERSONEL_GIRISLERI = {
     "SİDAL ZENGİN": "2025-11-17", "SELEN ŞEN": "2025-11-03"
 }
 
-def hakedis_bul(yil):
-    if yil < 1: return 0
-    if yil < 5: return 14
-    if yil < 15: return 20
-    return 26
-
 def yukle():
     try:
         df = pd.read_csv(CSV)
         if df.empty: return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
         df.columns = [str(c).strip() for c in df.columns]
         ad_col = next((c for c in df.columns if "AD" in c.upper()), df.columns[2])
-        if "Durum" not in df.columns: df["Durum"] = "Onaylandı"
-        df["Durum"] = df["Durum"].fillna("Onay Bekliyor").astype(str).str.strip()
+        df["Durum"] = df.get("Durum", "Onaylandı").fillna("Onay Bekliyor").astype(str).str.strip()
         df[ad_col] = df[ad_col].astype(str).str.strip().str.upper()
-        df_bekleyen = df[df["Durum"].str.contains("Bekliyor", case=False, na=True)].copy()
-        df_onayli = df[df["Durum"].str.contains("Onaylandı", case=False, na=False)].copy()
-        return df, df_bekleyen, df_onayli, ad_col
+        df_b = df[df["Durum"].str.contains("Bekliyor", case=False, na=True)].copy()
+        df_o = df[df["Durum"].str.contains("Onaylandı", case=False, na=False)].copy()
+        return df, df_b, df_o, ad_col
     except: return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
 
 menu = st.sidebar.radio("📌 MENÜ", ["👤 PERSONEL GİRİŞİ", "🔐 YÖNETİCİ PANELİ"])
@@ -80,57 +73,45 @@ else:
         
         with t[0]: # Onay Bekleyenler
             if not df_b.empty:
-                df_b_goster = df_b.copy()
-                df_b_goster.insert(0, "ID", df_b_goster.index + 2)
-                st.table(df_b_goster[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
-                c1, c2 = st.columns(2)
-                onay_id = c1.number_input("İşlem Yapılacak ID:", min_value=2, step=1, key="onay_id")
-                if c2.button("✅ SEÇİLENİ ONAYLA"):
-                    secim = df_b_goster[df_b_goster["ID"] == onay_id]
+                df_b_g = df_b.copy(); df_b_g.insert(0, "ID", df_b_g.index + 2)
+                st.table(df_b_g[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
+                c1, c2 = st.columns(2); o_id = c1.number_input("İşlem Yapılacak ID:", min_value=2, step=1)
+                if c2.button("✅ ONAYLA"):
+                    secim = df_b_g[df_b_g["ID"] == o_id]
                     if not secim.empty:
                         p_ad, p_tur, p_bas, p_bit = secim[ad_c].values[0], secim["Tür"].values[0], secim["Başlangıç"].values[0], secim["Dönüş"].values[0]
-                        requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(onay_id)}))
-                        st.session_state['wa_onay'] = f"✅ *SAYIN {p_ad},*\n\n🗓 *{p_bas} - {p_bit}* tarihlerindeki\n📋 *{p_tur}* talebiniz alınmıştır.\n\n📝 Programı düzenleyip dilekçenizi iletmeyi unutmayınız."
+                        requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(o_id)}))
+                        st.session_state['msg_onay'] = f"✅ *SAYIN {p_ad},*\n\n🗓 *{p_bas} - {p_bit}* tarihlerindeki\n📋 *{p_tur}* talebiniz onaylanmıştır.\n\n📝 Programı düzenleyip dilekçenizi iletmeyi unutmayınız."
                         st.success("Onaylandı!")
-                if 'wa_onay' in st.session_state:
-                    st.link_button("🟢 ONAY MESAJINI GÖNDER", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_onay'])}", use_container_width=True)
+                if 'msg_onay' in st.session_state:
+                    st.link_button("🟢 ONAY MESAJINI GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['msg_onay'])}", use_container_width=True)
             else: st.success("Bekleyen yok.")
 
         with t[3]: # Manuel Giriş
             with st.form("m_form"):
                 m_ad = st.selectbox("Personel", p_listesi); m_tr = st.selectbox("Tür", IZ[:-1])
                 m_t1, m_t2 = st.date_input("Başlangıç"), st.date_input("Dönüş")
-                if st.form_submit_button("ONAYLI KAYIT EKLE"):
-                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"","ad":m_ad,"brans":"Y","tur":f"{m_tr} (Tam)","bas":m_t1.strftime(F_TARIH),"bit":m_t2.strftime(F_TARIH), "durum": "Onaylandı"}))
-                    st.session_state['wa_man'] = f"✅ *SAYIN {m_ad},*\n\n🗓 *{m_t1.strftime(F_TARIH)} - {m_t2.strftime(F_TARIH)}* tarihlerindeki *{m_tr}* kaydınız yönetici tarafından işlenmiş ve onaylanmıştır."
+                if st.form_submit_button("KAYDET VE ONAYLA"):
+                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":m_ad,"tur":f"{m_tr} (Tam)","bas":m_t1.strftime(F_TARIH),"bit":m_t2.strftime(F_TARIH), "durum": "Onaylandı"}))
+                    st.session_state['msg_man'] = f"✅ *SAYIN {m_ad},*\n\n🗓 *{m_t1.strftime(F_TARIH)} - {m_t2.strftime(F_TARIH)}* tarihlerindeki *{m_tr}* kaydınız yönetici tarafından işlenmiştir."
                     st.success("Kayıt eklendi.")
-            if 'wa_man' in st.session_state:
-                st.link_button("🟢 MANUEL KAYIT BİLGİSİ GÖNDER", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_man'])}", use_container_width=True)
+            if 'msg_man' in st.session_state:
+                st.link_button("🟢 BİLGİ MESAJI GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['msg_man'])}", use_container_width=True)
 
         with t[4]: # Geç Kalma
             with st.form("g_form"):
-                g_ad = st.selectbox("Personel Seç", p_listesi); g_t = st.date_input("Tarih"); g_d = st.slider("Dakika", 1, 60, 15)
-                if st.form_submit_button("GEÇ KALMA İŞLE"):
-                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"tc":"","ad":g_ad,"brans":"Y","tur":"Geç Kalma","bas":f"{g_t.strftime(F_TARIH)} 09:00","bit":f"{g_t.strftime(F_TARIH)} 09:{g_d:02d}", "durum": "Onaylandı"}))
-                    st.session_state['wa_gec'] = f"⏰ *BİLGİLENDİRME*\nSayın {g_ad}, *{g_t.strftime(F_TARIH)}* tarihindeki *{g_d} dakikalık* geç kalmanız sisteme işlenmiştir."
+                g_ad = st.selectbox("Personel", p_listesi); g_t = st.date_input("Tarih"); g_d = st.slider("Dakika", 1, 60, 15)
+                if st.form_submit_button("GEÇ KALMAYI İŞLE"):
+                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":g_ad,"tur":"Geç Kalma","bas":f"{g_t.strftime(F_TARIH)} 09:00","bit":f"{g_t.strftime(F_TARIH)} 09:{g_d:02d}", "durum": "Onaylandı"}))
+                    st.session_state['msg_gec'] = f"⏰ *BİLGİLENDİRME*\nSayın {g_ad}, *{g_t.strftime(F_TARIH)}* tarihindeki *{g_d} dakikalık* geç kalmanız sisteme işlenmiştir."
                     st.success("İşlendi.")
-            if 'wa_gec' in st.session_state:
-                st.link_button("🟢 GEÇ KALMA BİLGİSİ GÖNDER", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_gec'])}", use_container_width=True)
+            if 'msg_gec' in st.session_state:
+                st.link_button("🟢 GEÇ KALMA BİLGİSİ GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['msg_gec'])}", use_container_width=True)
 
-        with t[1]: # Karne (Kısaltılmış Fonksiyon)
-            if not df_o.empty:
-                df_o['T'] = pd.to_datetime(df_o['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
-                df_o['Ay'] = df_o['T'].dt.strftime('%B').map(TR) + " " + df_o['T'].dt.strftime('%Y')
-                ay_sec = st.selectbox("Ay Seç", sorted(df_o['Ay'].dropna().unique(), reverse=True))
-                st.dataframe(df_o[df_o['Ay']==ay_sec].groupby([ad_c,'Tür']).size(), use_container_width=True)
-        with t[2]: # Sicil
-            ps = st.selectbox("Personel", p_listesi)
-            if not df_o.empty: st.dataframe(df_o[df_o[ad_c]==ps][['Başlangıç','Dönüş','Tür']], use_container_width=True)
         with t[6]: # Liste ve Silme
             if not df_all.empty:
                 df_l = df_all.copy(); df_l.insert(0, "ID", df_l.index + 2); st.dataframe(df_l, use_container_width=True)
-                c1, c2 = st.columns(2); sil_id = c1.number_input("Silinecek ID:", min_value=2, step=1, key="sil_id_input")
+                c1, c2 = st.columns(2); sil_id = c1.number_input("Silinecek ID:", min_value=2, step=1)
                 if c2.button("❌ SİL"):
                     requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sil_id)}))
                     st.error("Silindi.")
-
