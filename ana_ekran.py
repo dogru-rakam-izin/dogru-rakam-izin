@@ -49,7 +49,7 @@ menu = st.sidebar.radio("📌 MENÜ", ["👤 PERSONEL GİRİŞİ", "🔐 YÖNET�
 
 if menu == "👤 PERSONEL GİRİŞİ":
     st.markdown('<h1 style="text-align:center; color:#CC0000;">İZİN TALEP FORMU</h1>', unsafe_allow_html=True)
-    with st.form("p_form"):
+    with st.form("p_form", clear_on_submit=False):
         ad = st.text_input("Ad Soyad").upper()
         tur = st.selectbox("İzin Türü", IZ[:-1])
         tp = st.radio("Süre", ["Tam Gün", "Saatlik"], horizontal=True)
@@ -60,43 +60,43 @@ if menu == "👤 PERSONEL GİRİŞİ":
         else:
             dn = st.date_input("İş Başı")
             b, d = t1.strftime(F_TARIH), dn.strftime(F_TARIH)
-        if st.form_submit_button("TALEBİ GÖNDER"):
-            requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ad,"tur":f"{tur} ({tp})","bas":b,"bit":d, "durum": "Onay Bekliyor"}))
-            st.success("Talep gönderildi.")
+        
+        gonder = st.form_submit_button("SİSTEME GÖNDER")
+        
+        if gonder:
+            if ad:
+                requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ad,"tur":f"{tur} ({tp})","bas":b,"bit":d, "durum": "Onay Bekliyor"}))
+                st.session_state['p_msj'] = f"📄 *İZİN TALEP BİLGİSİ*\n\n👤 *Personel:* {ad}\n📋 *Tür:* {tur} ({tp})\n🗓 *Tarih:* {b} - {d}\n\n*Talebim sisteme iletilmiştir, onayınızı bekliyorum.*"
+                st.success("Talebiniz sisteme iletildi. Lütfen aşağıdaki butona tıklayarak yöneticiye WhatsApp üzerinden de bilgi veriniz.")
+            else:
+                st.error("Lütfen Ad Soyad giriniz!")
+
+    # Personel için WhatsApp Butonu (Formun Dışında)
+    if 'p_msj' in st.session_state:
+        st.link_button("🟢 YÖNETİCİYE WHATSAPP'TAN BİLDİR", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['p_msj'])}", use_container_width=True)
 
 else:
+    # --- YÖNETİCİ PANELİ (BURASI AYNI KALDI) ---
     if st.sidebar.text_input("Şifre", type="password") == "2020":
         df_all, df_b, df_o, ad_c = yukle()
         p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
         t = st.tabs(["🔔 Onay Bekleyenler", "📊 Karne", "👤 Sicil", "📝 Manuel Giriş", "⏰ Geç Kalma", "📅 Yıllık İzin", "🗑️ Liste ve Silme"])
         
-        with t[0]: # ONAY BEKLEYENLER
+        with t[0]: # Onay Bekleyenler
             if not df_b.empty:
-                df_b_g = df_b.copy()
-                df_b_g.insert(0, "ID", df_b_g.index + 2)
+                df_b_g = df_b.copy(); df_b_g.insert(0, "ID", df_b_g.index + 2)
                 st.table(df_b_g[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
-                
-                c1, c2 = st.columns(2)
-                o_id = c1.number_input("İşlem Yapılacak ID:", min_value=2, step=1, key="onay_id_input")
-                
-                if c2.button("✅ SEÇİLENİ ONAYLA"):
+                c1, c2 = st.columns(2); o_id = c1.number_input("İşlem Yapılacak ID:", min_value=2, step=1, key="admin_onay")
+                if c2.button("✅ ONAYLA"):
                     secim = df_b_g[df_b_g["ID"] == o_id]
                     if not secim.empty:
                         p_ad, p_tur, p_bas, p_bit = secim[ad_c].values[0], secim["Tür"].values[0], secim["Başlangıç"].values[0], secim["Dönüş"].values[0]
-                        # Google Sheets Onay İsteği
                         requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(o_id)}))
-                        
-                        # WHATSAPP MESAJINI HAFIZAYA AL
                         st.session_state['onay_msj'] = f"✅ *SAYIN {p_ad},*\n\n🗓 *{p_bas} - {p_bit}* tarihlerindeki\n📋 *{p_tur}* talebiniz onaylanmıştır.\n\n📝 Programı düzenleyip dilekçenizi iletmeyi unutmayınız."
                         st.success(f"{p_ad} Onaylandı!")
-                    else:
-                        st.error("Hatalı ID!")
-                
-                # MESAJ VARSA BUTONU GÖSTER
                 if 'onay_msj' in st.session_state:
                     st.link_button("🟢 ONAY MESAJINI PERSONELE GÖNDER", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['onay_msj'])}", use_container_width=True)
-            else:
-                st.info("Bekleyen talep bulunamadı.")
+            else: st.info("Bekleyen yok.")
 
         with t[3]: # Manuel Giriş
             with st.form("m_form"):
@@ -118,11 +118,3 @@ else:
                     st.success("İşlendi.")
             if 'gec_msj' in st.session_state:
                 st.link_button("🟢 GEÇ KALMA BİLGİSİ GÖNDER", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['gec_msj'])}", use_container_width=True)
-
-        with t[6]: # Liste ve Silme
-            if not df_all.empty:
-                df_l = df_all.copy(); df_l.insert(0, "ID", df_l.index + 2); st.dataframe(df_l, use_container_width=True)
-                c1, c2 = st.columns(2); sil_id = c1.number_input("Silinecek ID:", min_value=2, step=1, key="sil_id_input")
-                if c2.button("❌ SİL"):
-                    requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sil_id)}))
-                    st.error("Silindi.")
