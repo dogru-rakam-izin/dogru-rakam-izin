@@ -75,16 +75,16 @@ menu = st.sidebar.radio("📌 MENÜ", ["👤 PERSONEL GİRİŞİ", "🔐 YÖNET�
 
 if menu == "👤 PERSONEL GİRİŞİ":
     st.markdown('<h2 style="text-align:center; color:#CC0000;">İZİN TALEP FORMU</h2>', unsafe_allow_html=True)
-    with st.form("p_form"):
+    with st.form("p_form", clear_on_submit=False):
         p_ad = st.selectbox("Ad Soyad Seçiniz", p_listesi).upper()
         p_tur = st.selectbox("İzin Türü", IZ[:-1])
         p_tp = st.radio("Süre", ["Tam Gün", "Saatlik"], horizontal=True)
         p_t1 = st.date_input("İzin Günü / Başlangıç")
         
         if p_tp == "Saatlik":
-            p_s1 = st.time_input("Çıkış Saati")
-            p_s2 = st.time_input("Dönüş Saati")
-            # KRİTİK NOKTA: Saatleri tarihle birleştiriyoruz
+            p_s1 = st.time_input("Çıkış Saati", value=datetime.strptime("09:00", "%H:%M"))
+            p_s2 = st.time_input("Dönüş Saati", value=datetime.strptime("18:00", "%H:%M"))
+            # Tarih ve Saati birleştiriyoruz (SAAT SORUNU ÇÖZÜMÜ)
             p_b_final = f"{p_t1.strftime(F_TARIH)} {p_s1.strftime(F_SAAT)}"
             p_d_final = f"{p_t1.strftime(F_TARIH)} {p_s2.strftime(F_SAAT)}"
         else:
@@ -95,7 +95,7 @@ if menu == "👤 PERSONEL GİRİŞİ":
         if st.form_submit_button("TALEBİ SİSTEME GÖNDER"):
             requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":p_ad,"tur":f"{p_tur} ({p_tp})","bas":p_b_final,"bit":p_d_final, "durum": "Onay Bekliyor"}))
             st.session_state['wa_p_talep'] = f"📄 *YENİ İZİN TALEBİ*\n👤 *Personel:* {p_ad}\n📋 *Tür:* {p_tur} ({p_tp})\n🗓 *Zaman:* {p_b_final} - {p_d_final}\n\n*Onayınızı bekliyorum.*"
-            st.success("Talebiniz iletildi.")
+            st.success("Talebiniz başarıyla iletildi.")
 
     if 'wa_p_talep' in st.session_state:
         st.link_button("🟢 YÖNETİCİYE WHATSAPP'TAN BİLDİR", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_p_talep'])}", use_container_width=True)
@@ -158,7 +158,7 @@ else:
             if 'wa_adm_gec' in st.session_state:
                 st.link_button("🟢 GEÇ KALMA BİLGİSİ GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_adm_gec'])}", use_container_width=True)
 
-        with t[6]: # Silme
+        with t[6]: # Liste ve Silme
             if not df_all.empty:
                 df_l = df_all.copy(); df_l.insert(0, "ID", df_l.index + 2); st.dataframe(df_l, use_container_width=True)
                 sid = st.number_input("Sil ID:", min_value=2, step=1, key="adm_sil")
