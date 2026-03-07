@@ -1,11 +1,11 @@
 import streamlit as st
-import pandas as pd
+import pd as pd
 import requests
 import json
 from datetime import datetime
 import urllib.parse
 
-# --- AYARLAR (HİÇBİRİ DEĞİŞTİRİLMEDİ) ---
+# --- AYARLAR (KORUNDU) ---
 URL = "https://script.google.com/macros/s/AKfycbwp1CNfE5Lp9kKbFF99MvwX3PAwO2Y85NAWu5SCdj5TnhNnan7r-VBDEW9ONF9OqkuV/exec"
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
@@ -76,38 +76,33 @@ menu = st.sidebar.radio("📌 MENÜ", ["👤 PERSONEL GİRİŞİ", "🔐 YÖNET�
 if menu == "👤 PERSONEL GİRİŞİ":
     st.markdown('<h2 style="text-align:center; color:#CC0000;">İZİN TALEP FORMU</h2>', unsafe_allow_html=True)
     
-    # KESİN ÇÖZÜM: Seçimleri formun dışına aldık, böylece tıklandığı an sayfa yenilenir ve saatler görünür.
-    p_ad = st.selectbox("Ad Soyad Seçiniz", p_listesi).upper()
-    p_tur = st.selectbox("İzin Türü", IZ)
-    p_tp = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], horizontal=True)
-    p_t1 = st.date_input("İzin Günü / Başlangıç Tarihi")
+    p_ad = st.selectbox("Ad Soyad Seçiniz", p_listesi, key="p_ad").upper()
+    p_tur = st.selectbox("İzin Türü", IZ, key="p_tur")
+    p_tp = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], horizontal=True, key="p_tp")
+    p_t1 = st.date_input("İzin Günü / Başlangıç Tarihi", key="p_t1")
     
-    p_bas_final = ""
-    p_bit_final = ""
+    p_bas_f, p_bit_f = "", ""
 
     if p_tp == "Saatlik":
         c1, c2 = st.columns(2)
-        p_s1 = c1.time_input("Çıkış Saati", value=datetime.strptime("09:00", "%H:%M").time())
-        p_s2 = c2.time_input("Dönüş Saati", value=datetime.strptime("10:00", "%H:%M").time())
-        p_bas_final = f"{p_t1.strftime(F_TARIH)} {p_s1.strftime(F_SAAT)}"
-        p_bit_final = f"{p_t1.strftime(F_TARIH)} {p_s2.strftime(F_SAAT)}"
+        p_s1 = c1.time_input("Çıkış Saati", value=datetime.strptime("09:00", "%H:%M").time(), key="p_s1")
+        p_s2 = c2.time_input("Dönüş Saati", value=datetime.strptime("10:00", "%H:%M").time(), key="p_s2")
+        p_bas_f = f"{p_t1.strftime(F_TARIH)} {p_s1.strftime(F_SAAT)}"
+        p_bit_f = f"{p_t1.strftime(F_TARIH)} {p_s2.strftime(F_SAAT)}"
     else:
-        p_dn = st.date_input("İş Başı Tarihi (Dönüş)")
-        p_bas_final = p_t1.strftime(F_TARIH)
-        p_bit_final = p_dn.strftime(F_TARIH)
+        p_dn = st.date_input("İş Başı Tarihi (Dönüş)", key="p_dn")
+        p_bas_f, p_bit_f = p_t1.strftime(F_TARIH), p_dn.strftime(F_TARIH)
 
-    # Gönder butonu için küçük bir form
-    with st.form("gonder_form", clear_on_submit=False):
+    with st.form("p_submit_form"):
         if st.form_submit_button("TALEBİ SİSTEME GÖNDER", use_container_width=True):
-            requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":p_ad,"tur":f"{p_tur} ({p_tp})","bas":p_bas_final,"bit":p_bit_final, "durum": "Onay Bekliyor"}))
-            st.session_state['wa_p_talep'] = f"📄 *YENİ İZİN TALEBİ*\n👤 *Personel:* {p_ad}\n📋 *Tür:* {p_tur} ({p_tp})\n🗓 *Zaman:* {p_bas_final} - {p_bit_final}\n\n*Onayınızı bekliyorum.*"
-            st.success("Talebiniz iletildi. Lütfen WhatsApp butonuna basınız.")
+            requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":p_ad,"tur":f"{p_tur} ({p_tp})","bas":p_bas_f,"bit":p_bit_f, "durum": "Onay Bekliyor"}))
+            st.session_state['wa_p_talep'] = f"📄 *YENİ İZİN TALEBİ*\n👤 *Personel:* {p_ad}\n📋 *Tür:* {p_tur} ({p_tp})\n🗓 *Zaman:* {p_bas_f} - {p_bit_f}\n\n*Onayınızı bekliyorum.*"
+            st.success("Talebiniz iletildi.")
 
     if 'wa_p_talep' in st.session_state:
         st.link_button("🟢 YÖNETİCİYE WHATSAPP'TAN BİLDİR", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_p_talep'])}", use_container_width=True)
 
 else:
-    # --- YÖNETİCİ PANELİ (MEVCUT KODUNUZ) ---
     if st.sidebar.text_input("Şifre", type="password") == "2020":
         t = st.tabs(["🔔 Onay Bekleyenler", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel Giriş", "⏰ Geç Kalma", "🗑️ Liste/Sil"])
         
@@ -133,7 +128,7 @@ else:
                 st.dataframe(df_o[df_o['Ay']==ay_sec].groupby([ad_c,'Tür'])[['G','S']].sum(), use_container_width=True)
 
         with t[2]: # Sicil
-            ps = st.selectbox("Personel Seç", p_listesi)
+            ps = st.selectbox("Personel Seç", p_listesi, key="sicil_p")
             if not df_o.empty: st.dataframe(df_o[df_o[ad_c]==ps][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
 
         with t[3]: # Yıllık İzin
@@ -144,20 +139,32 @@ else:
             c1, c2, c3 = st.columns(3)
             c1.metric("Toplam Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
 
-        with t[4]: # Manuel Giriş
-            with st.form("m_form"):
-                ma, mt = st.selectbox("Personel", p_listesi), st.selectbox("Tür", IZ)
-                mt1, mt2 = st.date_input("Başlangıç"), st.date_input("Dönüş")
+        with t[4]: # MANUEL GİRİŞ (DÜZELTİLDİ)
+            ma = st.selectbox("Personel", p_listesi, key="m_ad")
+            mt = st.selectbox("Tür", IZ, key="m_tur")
+            ms = st.radio("Süre", ["Tam Gün", "Saatlik"], horizontal=True, key="m_süre")
+            mt1 = st.date_input("Tarih", key="m_t1")
+            m_bas, m_bit = "", ""
+            if ms == "Saatlik":
+                mc1, mc2 = st.columns(2)
+                ms1 = mc1.time_input("Başlangıç Saati", value=datetime.strptime("09:00", "%H:%M").time(), key="ms1")
+                ms2 = mc2.time_input("Bitiş Saati", value=datetime.strptime("10:00", "%H:%M").time(), key="ms2")
+                m_bas, m_bit = f"{mt1.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}", f"{mt1.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}"
+            else:
+                mt2 = st.date_input("Dönüş Tarihi", key="m_t2")
+                m_bas, m_bit = mt1.strftime(F_TARIH), mt2.strftime(F_TARIH)
+            
+            with st.form("m_form_sub"):
                 if st.form_submit_button("ONAYLI KAYDET"):
-                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ma,"tur":f"{mt} (Tam)","bas":mt1.strftime(F_TARIH),"bit":mt2.strftime(F_TARIH), "durum": "Onaylandı"}))
-                    st.session_state['wa_adm_man'] = f"✅ *SAYIN {ma},*\n🗓 *{mt1.strftime(F_TARIH)} - {mt2.strftime(F_TARIH)}* tarihlerindeki *{mt}* kaydınız işlenmiştir."
-                    st.success("Eklendi.")
+                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ma,"tur":f"{mt} ({ms})","bas":m_bas,"bit":m_bit, "durum": "Onaylandı"}))
+                    st.session_state['wa_adm_man'] = f"✅ *SAYIN {ma},*\n🗓 *{m_bas} - {m_bit}*\n📋 *{mt}* kaydınız sisteme işlenmiştir."
+                    st.success("İşlendi.")
             if 'wa_adm_man' in st.session_state:
                 st.link_button("🟢 BİLGİ MESAJI GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_adm_man'])}", use_container_width=True)
 
         with t[5]: # Geç Kalma
-            with st.form("g_form"):
-                ga, gt, gd = st.selectbox("Personel", p_listesi), st.date_input("Tarih"), st.slider("Dakika", 1, 60, 15)
+            ga, gt, gd = st.selectbox("Personel", p_listesi, key="g_ad"), st.date_input("Tarih", key="g_t"), st.slider("Dakika", 1, 60, 15)
+            with st.form("g_form_sub"):
                 if st.form_submit_button("İŞLE"):
                     requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ga,"tur":"Geç Kalma","bas":f"{gt.strftime(F_TARIH)} 09:00","bit":f"{gt.strftime(F_TARIH)} 09:{gd:02d}", "durum": "Onaylandı"}))
                     st.session_state['wa_adm_gec'] = f"⏰ *BİLGİLENDİRME*\nSayın {ga}, *{gt.strftime(F_TARIH)}* tarihindeki *{gd} dakikalık* geç kalmanız sisteme işlenmiştir."
