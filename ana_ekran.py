@@ -81,11 +81,14 @@ if menu == "👤 PERSONEL GİRİŞİ":
         p_tp = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], horizontal=True)
         p_t1 = st.date_input("İzin Günü / Başlangıç Tarihi")
         
-        # SAAT GÖRÜNÜRLÜĞÜ BURADA AYARLANIYOR
+        # --- SAAT SEÇİMİ BURADA GÖZÜKECEK ---
         if p_tp == "Saatlik":
-            c1, c2 = st.columns(2)
-            p_s1 = c1.time_input("Çıkış Saati", value=datetime.strptime("09:00", "%H:%M"))
-            p_s2 = c2.time_input("Dönüş Saati", value=datetime.strptime("10:00", "%H:%M"))
+            col1, col2 = st.columns(2)
+            with col1:
+                p_s1 = st.time_input("Çıkış Saati", value=datetime.strptime("09:00", "%H:%M").time())
+            with col2:
+                p_s2 = st.time_input("Dönüş Saati", value=datetime.strptime("10:00", "%H:%M").time())
+            
             p_b_val = f"{p_t1.strftime(F_TARIH)} {p_s1.strftime(F_SAAT)}"
             p_d_val = f"{p_t1.strftime(F_TARIH)} {p_s2.strftime(F_SAAT)}"
         else:
@@ -96,7 +99,7 @@ if menu == "👤 PERSONEL GİRİŞİ":
         if st.form_submit_button("TALEBİ SİSTEME GÖNDER"):
             requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":p_ad,"tur":f"{p_tur} ({p_tp})","bas":p_b_val,"bit":p_d_val, "durum": "Onay Bekliyor"}))
             st.session_state['wa_p_talep'] = f"📄 *YENİ İZİN TALEBİ*\n👤 *Personel:* {p_ad}\n📋 *Tür:* {p_tur} ({p_tp})\n🗓 *Zaman:* {p_b_val} - {p_d_val}\n\n*Onayınızı bekliyorum.*"
-            st.success(f"Kayıt İletildi: {p_b_val} - {p_d_val}")
+            st.success(f"Talep başarıyla iletildi: {p_b_val}")
 
     if 'wa_p_talep' in st.session_state:
         st.link_button("🟢 YÖNETİCİYE WHATSAPP'TAN BİLDİR", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_p_talep'])}", use_container_width=True)
@@ -105,7 +108,7 @@ else:
     if st.sidebar.text_input("Şifre", type="password") == "2020":
         t = st.tabs(["🔔 Onay Bekleyenler", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel Giriş", "⏰ Geç Kalma", "🗑️ Liste/Sil"])
         
-        with t[0]: # Onay
+        with t[0]: # Onay Bekleyenler
             if not df_b.empty:
                 df_b_g = df_b.copy(); df_b_g.insert(0, "ID", df_b_g.index + 2)
                 st.table(df_b_g[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
@@ -130,7 +133,7 @@ else:
             ps = st.selectbox("Personel Seç", p_listesi)
             if not df_o.empty: st.dataframe(df_o[df_o[ad_c]==ps][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
 
-        with t[3]: # Yıllık İzin
+        with t[3]: # Yıllık İzin (Hakediş)
             py = st.selectbox("Personel", p_listesi, key="adm_yillik")
             gt = datetime.strptime(PERSONEL_GIRISLERI.get(py, "2024-01-01"), "%Y-%m-%d")
             kidem = datetime.now().year - gt.year - ((datetime.now().month, datetime.now().day) < (gt.month, gt.day))
@@ -159,7 +162,7 @@ else:
             if 'wa_adm_gec' in st.session_state:
                 st.link_button("🟢 GEÇ KALMA BİLGİSİ GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_adm_gec'])}", use_container_width=True)
 
-        with t[6]: # Sil
+        with t[6]: # Liste ve Silme
             if not df_all.empty:
                 df_l = df_all.copy(); df_l.insert(0, "ID", df_l.index + 2); st.dataframe(df_l, use_container_width=True)
                 sid = st.number_input("Sil ID:", min_value=2, step=1, key="adm_sil")
