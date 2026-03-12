@@ -2,9 +2,8 @@ import streamlit as st
 import pandas as pd
 import requests
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 import urllib.parse
-from streamlit_calendar import calendar # Takvim kütüphanesi eklendi
 
 # --- AYARLAR (KORUNDU) ---
 URL = "https://script.google.com/macros/s/AKfycbwp1CNfE5Lp9kKbFF99MvwX3PAwO2Y85NAWu5SCdj5TnhNnan7r-VBDEW9ONF9OqkuV/exec"
@@ -43,14 +42,24 @@ def yukle():
     try:
         df = pd.read_csv(CSV)
         if df.empty: return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
+        
+        # Sütun isimlerini normalize et (boşlukları sil, büyük harf yap)
         df.columns = [str(c).strip() for c in df.columns]
-        ad_col = next((c for c in df.columns if "AD" in c.upper()), df.columns[2])
-        df["Durum"] = df.get("Durum", "Onaylandı").fillna("Onay Bekliyor").astype(str).str.strip()
+        
+        # Kritik sütunları bul (Sütun ismi tam eşleşmese bile içinde "AD", "TÜR", "DURUM" geçenleri bulur)
+        ad_col = next((c for c in df.columns if "AD" in c.upper()), "Ad Soyad")
+        tur_col = next((c for c in df.columns if "TÜR" in c.upper()), "Tür")
+        durum_col = next((c for c in df.columns if "DURUM" in c.upper()), "Durum")
+        bas_col = next((c for c in df.columns if "BAŞ" in c.upper()), "Başlangıç")
+        don_col = next((c for c in df.columns if "DÖN" in c.upper() or "BİT" in c.upper()), "Dönüş")
+
+        if durum_col not in df.columns: df[durum_col] = "Onaylandı"
+        df[durum_col] = df[durum_col].fillna("Onay Bekliyor").astype(str).str.strip()
         df[ad_col] = df[ad_col].astype(str).str.strip().str.upper()
         
         def h(r):
             try:
-                ts, b_str, d_str = str(r['Tür']), str(r['Başlangıç']).strip(), str(r['Dönüş']).strip()
+                ts, b_str, d_str = str(r[tur_col]), str(r[bas_col]).strip(), str(r[don_col]).strip()
                 if "Saatlik" in ts or "Geç Kalma" in ts:
                     b, d = datetime.strptime(b_str, F_TAM), datetime.strptime(d_str, F_TAM)
                     return 0, round((d-b).total_seconds()/3600, 2)
@@ -59,15 +68,19 @@ def yukle():
                     return (d-b).days, 0
             except: return 0, 0
 
-        df_b = df[df["Durum"].str.contains("Bekliyor", case=False, na=True)].copy()
-        df_o = df[df["Durum"].str.contains("Onaylandı", case=False, na=False)].copy()
+        df_b = df[df[durum_col].str.contains("Bekliyor", case=False, na=True)].copy()
+        df_o = df[df[durum_col].str.contains("Onaylandı", case=False, na=False)].copy()
+        
         if not df_o.empty:
             res = df_o.apply(lambda r: pd.Series(h(r)), axis=1)
             df_o['G'], df_o['S'] = res[0].astype(float), res[1].astype(float)
-            df_o['T'] = pd.to_datetime(df_o['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
+            df_o['T'] = pd.to_datetime(df_o[bas_col].str[:10], dayfirst=True, errors='coerce')
             df_o['Ay'] = df_o['T'].dt.strftime('%B').map(TR) + " " + df_o['T'].dt.strftime('%Y')
+        
         return df, df_b, df_o, ad_col
-    except: return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
+    except Exception as e:
+        st.error(f"Veri yükleme hatası: {e}")
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
 
 df_all, df_b, df_o, ad_c = yukle()
 p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
@@ -75,12 +88,13 @@ p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
 menu = st.sidebar.radio("📌 MENÜ", ["👤 PERSONEL GİRİŞİ", "🔐 YÖNETİCİ PANELİ"])
 
 if menu == "👤 PERSONEL GİRİŞİ":
-    # (Personel girişi kodunuz aynen korundu...)
     st.markdown('<h2 style="text-align:center; color:#CC0000;">İZİN TALEP FORMU</h2>', unsafe_allow_html=True)
+    
     p_ad = st.selectbox("Ad Soyad Seçiniz", p_listesi, key="p_ad").upper()
     p_tur = st.selectbox("İzin Türü", IZ, key="p_tur")
     p_tp = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], horizontal=True, key="p_tp")
     p_t1 = st.date_input("İzin Günü / Başlangıç Tarihi", key="p_t1")
+    
     p_bas_f, p_bit_f = "", ""
     if p_tp == "Saatlik":
         c1, c2 = st.columns(2)
@@ -91,24 +105,27 @@ if menu == "👤 PERSONEL GİRİŞİ":
     else:
         p_dn = st.date_input("İş Başı Tarihi (Dönüş)", key="p_dn")
         p_bas_f, p_bit_f = p_t1.strftime(F_TARIH), p_dn.strftime(F_TARIH)
+
     with st.form("p_submit_form"):
         if st.form_submit_button("TALEBİ SİSTEME GÖNDER", use_container_width=True):
             requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":p_ad,"tur":f"{p_tur} ({p_tp})","bas":p_bas_f,"bit":p_bit_f, "durum": "Onay Bekliyor"}))
             st.session_state['wa_p_talep'] = f"📄 *YENİ İZİN TALEBİ*\n👤 *Personel:* {p_ad}\n📋 *Tür:* {p_tur} ({p_tp})\n🗓 *Zaman:* {p_bas_f} - {p_bit_f}\n\n*Onayınızı bekliyorum.*"
             st.success("Talebiniz iletildi.")
+
     if 'wa_p_talep' in st.session_state:
         st.link_button("🟢 YÖNETİCİYE WHATSAPP'TAN BİLDİR", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_p_talep'])}", use_container_width=True)
 
 else:
     if st.sidebar.text_input("Şifre", type="password") == "2020":
-        # YENİ SEKME EKLENDİ: "📅 İzin Takvimi"
-        t = st.tabs(["🔔 Onay Bekleyenler", "📅 İzin Takvimi", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel Giriş", "⏰ Geç Kalma", "🗑️ Liste/Sil"])
+        t = st.tabs(["🔔 Onay Bekleyenler", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel Giriş", "⏰ Geç Kalma", "🗑️ Liste/Sil"])
         
-        with t[0]: # Onay (Kodunuz korundu)
+        with t[0]: # Onay Bekleyenler
             if not df_b.empty:
-                df_b_g = df_b.copy(); df_b_g.insert(0, "ID", df_b_g.index + 2)
+                df_b_g = df_b.copy()
+                df_b_g.insert(0, "ID", df_b_g.index + 2)
                 st.table(df_b_g[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
-                c1, c2 = st.columns(2); o_id = c1.number_input("İşlem ID:", min_value=2, step=1, key="adm_on_id")
+                c1, c2 = st.columns(2)
+                o_id = c1.number_input("İşlem ID:", min_value=2, step=1, key="adm_on_id")
                 if c2.button("✅ ONAYLA"):
                     sec = df_b_g[df_b_g["ID"] == o_id]
                     if not sec.empty:
@@ -118,47 +135,37 @@ else:
                         st.success(f"{pa} onaylandı!")
                 if 'wa_adm_onay' in st.session_state:
                     st.link_button("🟢 ONAY MESAJINI GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_adm_onay'])}", use_container_width=True)
-            else: st.info("Bekleyen yok.")
+            else:
+                st.info("Onay bekleyen izin talebi bulunmuyor.")
 
-        with t[1]: # 📅 İZİN TAKVİMİ (YENİ ÖZELLİK)
-            st.subheader("Kurumsal İzin Takvimi")
-            calendar_events = []
+        with t[1]: # Karne
             if not df_o.empty:
-                for idx, row in df_o.iterrows():
-                    try:
-                        # Tarih formatlarını FullCalendar'ın anlayacağı şekle getiriyoruz
-                        b_str = str(row['Başlangıç']).strip()
-                        d_str = str(row['Dönüş']).strip()
-                        
-                        if " " in b_str: # Saatlik İzin
-                            start_dt = datetime.strptime(b_str, F_TAM).isoformat()
-                            end_dt = datetime.strptime(d_str, F_TAM).isoformat()
-                            all_day = False
-                        else: # Tam Gün İzin
-                            start_dt = datetime.strptime(b_str, F_TARIH).strftime("%Y-%m-%d")
-                            # Bitiş tarihini takvimde tam göstermek için +1 gün ekliyoruz
-                            end_dt = (datetime.strptime(d_str, F_TARIH)).strftime("%Y-%m-%d")
-                            all_day = True
-                        
-                        calendar_events.append({
-                            "title": f"{row[ad_c]} - {row['Tür']}",
-                            "start": start_dt,
-                            "end": end_dt,
-                            "allDay": all_day,
-                            "color": "#FF4B4B" if "Yıllık" in row['Tür'] else "#3D9DF3"
-                        })
-                    except: continue
+                aylar = sorted(df_o['Ay'].dropna().unique(), reverse=True)
+                if aylar:
+                    ay_sec = st.selectbox("Ay Seç", aylar)
+                    st.dataframe(df_o[df_o['Ay']==ay_sec].groupby([ad_c,'Tür'])[['G','S']].sum(), use_container_width=True)
+                else: st.warning("Karne oluşturulacak onaylı veri bulunamadı.")
+            else: st.info("Henüz onaylanmış bir izin yok.")
 
-            calendar_options = {
-                "headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek"},
-                "initialView": "dayGridMonth",
-                "locale": "tr",
-            }
-            calendar(events=calendar_events, options=calendar_options)
-
-        # Diğer sekmeler (Karne, Sicil, Manuel Giriş vb.) kodunuzdaki gibi devam ediyor...
-        with t[2]: # Karne
+        with t[2]: # Sicil
+            ps = st.selectbox("Personel Seç", p_listesi, key="sicil_p")
             if not df_o.empty:
-                ay_sec = st.selectbox("Ay Seç", sorted(df_o['Ay'].dropna().unique(), reverse=True))
-                st.dataframe(df_o[df_o['Ay']==ay_sec].groupby([ad_c,'Tür'])[['G','S']].sum(), use_container_width=True)
-        # ... (Geri kalan tüm bölümler aynen korunmuştur)
+                sicil_df = df_o[df_o[ad_c]==ps][['Başlangıç','Dönüş','Tür','G','S']]
+                if not sicil_df.empty: st.dataframe(sicil_df, use_container_width=True)
+                else: st.info(f"{ps} için onaylı izin kaydı bulunamadı.")
+
+        with t[3]: # Yıllık İzin
+            py = st.selectbox("Personel", p_listesi, key="adm_yillik")
+            gt_str = PERSONEL_GIRISLERI.get(py, "2024-01-01")
+            gt = datetime.strptime(gt_str, "%Y-%m-%d")
+            kidem = datetime.now().year - gt.year - ((datetime.now().month, datetime.now().day) < (gt.month, gt.day))
+            hk = hakedis_bul(max(0, kidem))
+            ku = df_o[(df_o[ad_c]==py) & (df_o['Tür'].str.contains("Yıllık", na=False))]['G'].sum() if not df_o.empty else 0
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Toplam Hak", f"{hk} G")
+            c2.metric("Kullanılan", f"{ku} G")
+            c3.metric("Kalan", f"{hk-ku} G")
+
+        with t[4]: # Manuel Giriş
+            ma = st.selectbox("Personel", p_listesi, key="m_ad")
+            mt = st.selectbox("
