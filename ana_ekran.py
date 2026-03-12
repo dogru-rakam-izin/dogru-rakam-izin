@@ -128,19 +128,28 @@ else:
                 for _, row in df_o.iterrows():
                     try:
                         b_str, d_str = str(row['Başlangıç']), str(row['Dönüş'])
-                        if len(b_str) > 10: # Saatlik
+                        if len(b_str) > 10: # Saatlik veya Geç Kalma
                             start = datetime.strptime(b_str, F_TAM).isoformat()
                             end = datetime.strptime(d_str, F_TAM).isoformat()
                             all_day = False
-                        else: # Günlük
+                        else: # Günlük İzin
                             start = datetime.strptime(b_str, F_TARIH).strftime("%Y-%m-%d")
                             end = datetime.strptime(d_str, F_TARIH).strftime("%Y-%m-%d")
                             all_day = True
                         
+                        # --- RENK MANTĞI BURADA ---
+                        tur = row['Tür']
+                        if "Yıllık" in tur:
+                            renk = "#FF4B4B"  # Kırmızı
+                        elif "Geç Kalma" in tur:
+                            renk = "#FFA500"  # Turuncu
+                        else:
+                            renk = "#3D9DF3"  # Mavi
+                        
                         events.append({
-                            "title": f"{row[ad_c]} ({row['Tür']})",
+                            "title": f"{row[ad_c]} ({tur})",
                             "start": start, "end": end, "allDay": all_day,
-                            "color": "#FF4B4B" if "Yıllık" in row['Tür'] else "#3D9DF3"
+                            "color": renk
                         })
                     except: continue
             calendar(events=events, options={"headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek"}, "locale": "tr"})
@@ -204,3 +213,4 @@ else:
                 if st.button("❌ KAYDI SİL"):
                     requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sid)}))
                     st.error("Silindi.")
+
