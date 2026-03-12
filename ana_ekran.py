@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import urllib.parse
+from streamlit_calendar import calendar # Takvim için gerekli
 
 # --- AYARLAR ---
 URL = "https://script.google.com/macros/s/AKfycbwp1CNfE5Lp9kKbFF99MvwX3PAwO2Y85NAWu5SCdj5TnhNnan7r-VBDEW9ONF9OqkuV/exec"
@@ -45,7 +46,6 @@ def yukle():
         df.columns = [str(c).strip() for c in df.columns]
         ad_col = next((c for c in df.columns if "AD" in c.upper()), "Ad Soyad")
         durum_col = next((c for c in df.columns if "DURUM" in c.upper()), "Durum")
-        
         df[durum_col] = df.get(durum_col, "Onay Bekliyor").fillna("Onay Bekliyor").astype(str).str.strip()
         df[ad_col] = df[ad_col].astype(str).str.strip().str.upper()
         
@@ -82,7 +82,6 @@ if menu == "👤 PERSONEL GİRİŞİ":
     p_tur = st.selectbox("İzin Türü", IZ, key="p_tur")
     p_tp = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], horizontal=True, key="p_tp")
     p_t1 = st.date_input("İzin Günü / Başlangıç Tarihi", key="p_t1")
-    
     p_bas_f, p_bit_f = "", ""
     if p_tp == "Saatlik":
         c1, c2 = st.columns(2)
@@ -93,19 +92,18 @@ if menu == "👤 PERSONEL GİRİŞİ":
     else:
         p_dn = st.date_input("İş Başı Tarihi (Dönüş)", key="p_dn")
         p_bas_f, p_bit_f = p_t1.strftime(F_TARIH), p_dn.strftime(F_TARIH)
-
     with st.form("p_submit_form"):
         if st.form_submit_button("TALEBİ SİSTEME GÖNDER", use_container_width=True):
             requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":p_ad,"tur":f"{p_tur} ({p_tp})","bas":p_bas_f,"bit":p_bit_f, "durum": "Onay Bekliyor"}))
             st.session_state['wa_p_talep'] = f"📄 *YENİ İZİN TALEBİ*\n👤 *Personel:* {p_ad}\n📋 *Tür:* {p_tur} ({p_tp})\n🗓 *Zaman:* {p_bas_f} - {p_bit_f}\n\n*Onayınızı bekliyorum.*"
             st.success("Talebiniz iletildi.")
-
     if 'wa_p_talep' in st.session_state:
         st.link_button("🟢 YÖNETİCİYE WHATSAPP'TAN BİLDİR", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_p_talep'])}", use_container_width=True)
 
 else:
     if st.sidebar.text_input("Şifre", type="password") == "2020":
-        t = st.tabs(["🔔 Onay Bekleyenler", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel Giriş", "⏰ Geç Kalma", "🗑️ Liste/Sil"])
+        # TAKVİM SEKMESİ BURAYA EKLENDİ
+        t = st.tabs(["🔔 Onay Bekleyenler", "📅 Takvim", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel Giriş", "⏰ Geç Kalma", "🗑️ Liste/Sil"])
         
         with t[0]: # Onay
             if not df_b.empty:
@@ -123,18 +121,42 @@ else:
                     st.link_button("🟢 ONAY MESAJINI GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_adm_onay'])}", use_container_width=True)
             else: st.info("Bekleyen yok.")
 
-        with t[1]: # Karne
+        with t[1]: # 📅 TAKVİM GÖRÜNÜMÜ
+            st.subheader("İzin Takvimi")
+            events = []
+            if not df_o.empty:
+                for _, row in df_o.iterrows():
+                    try:
+                        b_str, d_str = str(row['Başlangıç']), str(row['Dönüş'])
+                        if len(b_str) > 10: # Saatlik
+                            start = datetime.strptime(b_str, F_TAM).isoformat()
+                            end = datetime.strptime(d_str, F_TAM).isoformat()
+                            all_day = False
+                        else: # Günlük
+                            start = datetime.strptime(b_str, F_TARIH).strftime("%Y-%m-%d")
+                            end = datetime.strptime(d_str, F_TARIH).strftime("%Y-%m-%d")
+                            all_day = True
+                        
+                        events.append({
+                            "title": f"{row[ad_c]} ({row['Tür']})",
+                            "start": start, "end": end, "allDay": all_day,
+                            "color": "#FF4B4B" if "Yıllık" in row['Tür'] else "#3D9DF3"
+                        })
+                    except: continue
+            calendar(events=events, options={"headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek"}, "locale": "tr"})
+
+        with t[2]: # Karne
             if not df_o.empty:
                 ay_list = sorted(df_o['Ay'].dropna().unique(), reverse=True)
                 if ay_list:
                     ay_sec = st.selectbox("Ay Seç", ay_list)
                     st.dataframe(df_o[df_o['Ay']==ay_sec].groupby([ad_c,'Tür'])[['G','S']].sum(), use_container_width=True)
 
-        with t[2]: # Sicil
+        with t[3]: # Sicil
             ps = st.selectbox("Personel Seç", p_listesi, key="sicil_p")
             if not df_o.empty: st.dataframe(df_o[df_o[ad_c]==ps][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
 
-        with t[3]: # Yıllık İzin
+        with t[4]: # Yıllık İzin
             py = st.selectbox("Personel", p_listesi, key="adm_yillik")
             gt = datetime.strptime(PERSONEL_GIRISLERI.get(py, "2024-01-01"), "%Y-%m-%d")
             kidem = datetime.now().year - gt.year - ((datetime.now().month, datetime.now().day) < (gt.month, gt.day))
@@ -142,7 +164,7 @@ else:
             c1, c2, c3 = st.columns(3)
             c1.metric("Toplam Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
 
-        with t[4]: # Manuel Giriş
+        with t[5]: # Manuel Giriş
             ma = st.selectbox("Personel Seç", p_listesi, key="m_ad")
             mt = st.selectbox("İzin Türü", IZ, key="m_tur")
             ms = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], horizontal=True, key="m_süre")
@@ -165,7 +187,7 @@ else:
             if 'wa_adm_man' in st.session_state:
                 st.link_button("🟢 BİLGİ MESAJI GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_adm_man'])}", use_container_width=True)
 
-        with t[5]: # Geç Kalma
+        with t[6]: # Geç Kalma
             ga, gt, gd = st.selectbox("Personel", p_listesi, key="g_ad"), st.date_input("Tarih", key="g_t"), st.slider("Dakika", 1, 60, 15)
             with st.form("g_form_sub"):
                 if st.form_submit_button("İŞLE"):
@@ -175,7 +197,7 @@ else:
             if 'wa_adm_gec' in st.session_state:
                 st.link_button("🟢 GEÇ KALMA BİLGİSİ GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_adm_gec'])}", use_container_width=True)
 
-        with t[6]: # Sil
+        with t[7]: # Sil
             if not df_all.empty:
                 df_l = df_all.copy(); df_l.insert(0, "ID", df_l.index + 2); st.dataframe(df_l, use_container_width=True)
                 sid = st.number_input("Sil ID:", min_value=2, step=1, key="adm_sil")
