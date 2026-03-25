@@ -139,10 +139,10 @@ if menu == "👤 PERSONEL GİRİŞİ":
         requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":p_ad,"tur":f"{p_tur} ({p_tp})","bas":p_bas_f,"bit":p_bit_f, "durum": "Onay Bekliyor"}))
         st.success("Talebiniz başarıyla iletildi.")
         
-        # WHATSAPP PAYLAŞIM
-        mesaj = f"*YENİ İZİN TALEBİ*\n👤 *Personel:* {p_ad}\n📝 *Tür:* {p_tur}\n📅 *Başlangıç:* {p_bas_f}\n🔙 *Dönüş:* {p_bit_f}"
-        wp_url = f"https://wa.me/?text={urllib.parse.quote(mesaj)}"
-        st.markdown(f'<a href="{wp_url}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:10px;text-align:center;border-radius:5px;">📢 WHATSAPP İLE YÖNETİCİYE BİLDİR</div></a>', unsafe_allow_html=True)
+    # WHATSAPP BUTONU (HER ZAMAN GÖRÜNÜR)
+    mesaj = f"*YENİ İZİN TALEBİ*\n👤 *Personel:* {p_ad}\n📝 *Tür:* {p_tur}\n📅 *Başlangıç:* {p_bas_f}\n🔙 *Dönüş:* {p_bit_f}"
+    wp_url = f"https://wa.me/?text={urllib.parse.quote(mesaj)}"
+    st.markdown(f'<br><a href="{wp_url}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:12px;text-align:center;border-radius:10px;font-weight:bold;font-size:16px;">📢 WHATSAPP İLE YÖNETİCİYE BİLDİR</div></a>', unsafe_allow_html=True)
 
 else:
     sifre = st.sidebar.text_input("Yönetici Şifresi", type="password")
@@ -157,12 +157,12 @@ else:
                 o_id = st.number_input("Onay ID:", min_value=2, step=1)
                 if st.button("✅ ONAYLA"):
                     requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(o_id)}))
-                    st.success("Kayıt Onaylandı!")
+                    st.success("Onaylandı!")
                     st.rerun()
-            else: st.info("Onay bekleyen kayıt yok.")
+            else: st.info("Bekleyen onay yok.")
 
-        with t[1]: # Takvim (Geliştirilmiş Görünüm)
-            st.subheader("İzin ve Geç Kalma Takvimi")
+        with t[1]: # Takvim (GÜVENLİ YÜKLEME)
+            st.subheader("İzin Takvimi")
             evs = []
             if not df_o.empty:
                 for _, r in df_o.iterrows():
@@ -177,7 +177,7 @@ else:
                             "color": "#FF4B4B" if "Yıllık" in str(r['Tür']) else "#FFA500" if "Geç Kalma" in str(r['Tür']) else "#3D9DF3"
                         })
                     except: continue
-            calendar(events=evs, options={"locale":"tr", "headerToolbar":{"left":"prev,next today","center":"title","right":"dayGridMonth,timeGridWeek"}}, key="takvim_final")
+            calendar(events=evs, options={"locale":"tr", "headerToolbar":{"left":"prev,next today","center":"title","right":"dayGridMonth,timeGridWeek"}}, key="takvim_v4")
 
         with t[2]: # Karne
             if not df_o.empty:
@@ -190,10 +190,10 @@ else:
                     ek_df['S'] = ek_df['S'].apply(lambda x: sure_formatla(x, "S"))
                     st.dataframe(ek_df, use_container_width=True)
                     pdf_v = pdf_olustur(k_df, ay_sec)
-                    st.download_button("📥 PDF OLARAK İNDİR", data=pdf_v, file_name=f"Karne_{ay_sec}.pdf", mime="application/pdf")
+                    st.download_button("📥 PDF İNDİR", data=pdf_v, file_name=f"Karne_{ay_sec}.pdf", mime="application/pdf")
 
         with t[3]: # Sicil
-            ps = st.selectbox("Personel", p_listesi, key="s_p")
+            ps = st.selectbox("Personel Seç", p_listesi, key="s_p")
             if not df_o.empty:
                 s_df = df_o[df_o[ad_c]==ps][['Başlangıç','Dönüş','Tür','G','S']].copy()
                 s_df['G'] = s_df['G'].apply(lambda x: sure_formatla(x, "G"))
@@ -201,53 +201,20 @@ else:
                 st.dataframe(s_df, use_container_width=True)
 
         with t[4]: # Yıllık İzin
-            py = st.selectbox("Personel Seç", p_listesi, key="y_p")
+            py = st.selectbox("Personel", p_listesi, key="y_p")
             gt_s = PERSONEL_GIRISLERI.get(py, "2024-01-01")
             gt = datetime.strptime(gt_s, "%Y-%m-%d")
             kd = datetime.now().year - gt.year - ((datetime.now().month, datetime.now().day) < (gt.month, gt.day))
             hk = hakedis_bul(max(0, kd))
             ku = df_o[(df_o[ad_c]==py) & (df_o['Tür'].str.contains("Yıllık"))]['G'].sum() if not df_o.empty else 0
-            st.metric("Kalan Yıllık İzin", f"{hk-ku} Gün")
+            st.metric("Kalan İzin", f"{hk-ku} Gün")
 
-        with t[5]: # Manuel (Saatli İzin Düzeltildi)
+        with t[5]: # Manuel (Saatli İzin Desteği Mevcut)
             ma = st.selectbox("Personel", p_listesi, key="m_a")
-            mt = st.selectbox("Tür", IZIN_TURLERI, key="m_t")
-            m_tip = st.radio("Kayıt Tipi", ["Tam Gün", "Saatlik"], horizontal=True, key="m_tip")
-            mt1 = st.date_input("Tarih / Başlangıç", key="m_d1")
+            mt = st.selectbox("İzin Türü", IZIN_TURLERI, key="m_t")
+            m_tip = st.radio("Tip", ["Tam Gün", "Saatlik"], horizontal=True, key="m_tip")
+            mt1 = st.date_input("Başlangıç Tarihi", key="m_d1")
             
-            m_bas_str, m_bit_str = "", ""
+            m_bas, m_bit = "", ""
             if m_tip == "Saatlik":
                 c1, c2 = st.columns(2)
-                ms1 = c1.time_input("Çıkış Saati", value=datetime.strptime("09:00", "%H:%M").time(), key="ms1")
-                ms2 = c2.time_input("Dönüş Saati", value=datetime.strptime("10:00", "%H:%M").time(), key="ms2")
-                m_bas_str = f"{mt1.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}"
-                m_bit_str = f"{mt1.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}"
-            else:
-                mt2 = st.date_input("İş Başı Tarihi", key="m_d2")
-                m_bas_str = mt1.strftime(F_TARIH)
-                m_bit_str = mt2.strftime(F_TARIH)
-                
-            if st.button("MANUEL ONAYLI KAYDET"):
-                requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ma,"tur":f"{mt} ({m_tip})","bas":m_bas_str,"bit":m_bit_str, "durum": "Onaylandı"}))
-                st.success("Sisteme işlendi.")
-                st.rerun()
-
-        with t[6]: # Geç Kalma
-            ga = st.selectbox("Personel", p_listesi, key="g_a")
-            gt = st.date_input("Geç Kalma Tarihi", key="g_t")
-            gd = st.slider("Dakika", 1, 120, 15)
-            if st.button("SİSTEME İŞLE"):
-                requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ga,"tur":"Geç Kalma","bas":f"{gt.strftime(F_TARIH)} 09:00","bit":f"{gt.strftime(F_TARIH)} 09:{gd:02d}", "durum": "Onaylandı"}))
-                st.success("İşlendi.")
-                st.rerun()
-
-        with t[7]: # Liste
-            if not df_all.empty:
-                df_l = df_all.copy()
-                df_l.insert(0, "ID", df_l.index + 2)
-                st.dataframe(df_l, use_container_width=True)
-                sid = st.number_input("Silinecek ID:", min_value=2, step=1)
-                if st.button("KAYDI SİL"):
-                    requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sid)}))
-                    st.error("Silindi.")
-                    st.rerun()
