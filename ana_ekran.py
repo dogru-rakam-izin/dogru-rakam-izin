@@ -24,22 +24,39 @@ def pdf_olustur(df, secili_ay):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     elements = []
+    
+    # Türkçe karakterler için basit bir temizlik/düzenleme (Eğer font yüklenemezse)
+    def tr_duzelt(metin):
+        return str(metin).replace('İ', 'I').replace('ı', 'i').replace('Ş', 'S').replace('ş', 's').replace('Ğ', 'G').replace('ğ', 'g').replace('Ü', 'U').replace('ü', 'u').replace('Ö', 'O').replace('ö', 'o').replace('Ç', 'C').replace('ç', 'c')
+
     styles = getSampleStyleSheet()
-    title = Paragraph(f"<b>{secili_ay} - Personel Izin Karnesi</b>", styles['Title'])
+    # Başlık
+    title_text = f"<b>{secili_ay} - Personel Izin Karnesi</b>"
+    title = Paragraph(tr_duzelt(title_text), styles['Title'])
     elements.append(title)
     
     # Tablo verisi hazırlama
     data = [["Ad Soyad", "Izin Turu", "Gun", "Saat"]]
     for idx, row in df.iterrows():
-        data.append([str(idx[0]), str(idx[1]), str(row['G']), str(row['S'])])
+        # Sayıları virgüllü formata çevirme (Örn: 0.67 -> 0,67)
+        gun_v = str(row['G']).replace('.', ',')
+        saat_v = str(row['S']).replace('.', ',')
+        
+        data.append([
+            tr_duzelt(idx[0]), # Personel Adı
+            tr_duzelt(idx[1]), # İzin Türü
+            gun_v, 
+            saat_v
+        ])
     
-    table = Table(data)
+    table = Table(data, colWidths=[180, 150, 60, 60])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.darkred),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
         ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
     ]))
     elements.append(table)
@@ -155,13 +172,21 @@ else:
                     except: continue
             calendar(events=events, options={"locale": "tr"})
 
-        with t[2]: # Karne + PDF
+        with t[2]: # Karne
             if not df_o.empty:
                 ay_list = sorted(df_o['Ay'].dropna().unique(), reverse=True)
                 if ay_list:
                     ay_sec = st.selectbox("Ay Seç", ay_list)
                     k_df = df_o[df_o['Ay']==ay_sec].groupby([ad_c,'Tür'])[['G','S']].sum()
-                    st.dataframe(k_df, use_container_width=True)
+                    
+                    # --- EKRAN GÖRÜNÜMÜNÜ VİRGÜLLÜ YAPMA ---
+                    ekran_df = k_df.copy()
+                    ekran_df['G'] = ekran_df['G'].apply(lambda x: str(x).replace('.', ','))
+                    ekran_df['S'] = ekran_df['S'].apply(lambda x: str(x).replace('.', ','))
+                    
+                    st.dataframe(ekran_df, use_container_width=True)
+                    
+                    # PDF yine orijinal (sayısal) k_df'den üretilecek ama fonksiyon içinde virgüle dönecek
                     pdf = pdf_olustur(k_df, ay_sec)
                     st.download_button("📥 PDF OLARAK İNDİR", data=pdf, file_name=f"Karne_{ay_sec}.pdf", mime="application/pdf")
 
