@@ -24,62 +24,30 @@ def pdf_olustur(df, secili_ay):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     elements = []
-    styles = getSampleStyleSheet()
     
-    # Başlık
-    title = Paragraph(f"<b>{secili_ay} - Personel Izin Karnesi</b>", styles['Title'])
+    def tr_duzelt(metin):
+        return str(metin).replace('İ', 'I').replace('ı', 'i').replace('Ş', 'S').replace('ş', 's').replace('Ğ', 'G').replace('ğ', 'g').replace('Ü', 'U').replace('ü', 'u').replace('Ö', 'O').replace('ö', 'o').replace('Ç', 'C').replace('ç', 'c')
+
+    styles = getSampleStyleSheet()
+    title = Paragraph(f"<b>{tr_duzelt(secili_ay)} - Personel Izin Karnesi</b>", styles['Title'])
     elements.append(title)
     
     data = [["Ad Soyad", "Izin Turu", "Gun", "Saat"]]
     for idx, row in df.iterrows():
-        # Değer 0'dan büyükse yanına birim ekle, 0 ise boş bırak veya - koy
         g_deger = float(row['G'])
         s_deger = float(row['S'])
+        # Sayıları virgüllü yap ve yanına birim ekle
+        gun_m = f"{str(round(g_deger, 1)).replace('.', ',')} Gun" if g_deger > 0 else "-"
+        saat_m = f"{str(round(s_deger, 2)).replace('.', ',')} Saat" if s_deger > 0 else "-"
         
-        gun_metin = f"{str(round(g_deger, 1)).replace('.', ',')} Gun" if g_deger > 0 else "-"
-        saat_metin = f"{str(round(s_deger, 2)).replace('.', ',')} Saat" if s_deger > 0 else "-"
-        
-        data.append([idx[0], idx[1], gun_metin, saat_metin])
+        data.append([tr_duzelt(idx[0]), tr_duzelt(idx[1]), gun_m, saat_m])
     
     table = Table(data, colWidths=[180, 150, 70, 70])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.darkred),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
-    ]))
-    elements.append(table)
-    doc.build(elements)
-    return buffer.getvalue()
-    styles = getSampleStyleSheet()
-    # Başlık
-    title_text = f"<b>{secili_ay} - Personel Izin Karnesi</b>"
-    title = Paragraph(tr_duzelt(title_text), styles['Title'])
-    elements.append(title)
-    
-    # Tablo verisi hazırlama
-    data = [["Ad Soyad", "Izin Turu", "Gun", "Saat"]]
-    for idx, row in df.iterrows():
-        # Sayıları virgüllü formata çevirme (Örn: 0.67 -> 0,67)
-        gun_v = str(row['G']).replace('.', ',')
-        saat_v = str(row['S']).replace('.', ',')
-        
-        data.append([
-            tr_duzelt(idx[0]), # Personel Adı
-            tr_duzelt(idx[1]), # İzin Türü
-            gun_v, 
-            saat_v
-        ])
-    
-    table = Table(data, colWidths=[180, 150, 60, 60])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.darkred),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
         ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
     ]))
@@ -87,7 +55,7 @@ def pdf_olustur(df, secili_ay):
     doc.build(elements)
     return buffer.getvalue()
 
-# --- TASARIM VE AYARLAR ---
+# --- VERİ YÜKLEME ---
 F_TARIH, F_SAAT, F_TAM = '%d/%m/%Y', '%H:%M', '%d/%m/%Y %H:%M'
 TR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
 IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim", "Geç Kalma"]
@@ -166,7 +134,7 @@ if menu == "👤 PERSONEL GİRİŞİ":
     with st.form("p_submit"):
         if st.form_submit_button("TALEBİ GÖNDER", use_container_width=True):
             requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":p_ad,"tur":f"{p_tur} ({p_tp})","bas":p_bas_f,"bit":p_bit_f, "durum": "Onay Bekliyor"}))
-            st.success("İletildi.")
+            st.success("Talebiniz başarıyla iletildi.")
 
 else:
     if st.sidebar.text_input("Şifre", type="password") == "2020":
@@ -176,13 +144,13 @@ else:
             if not df_b.empty:
                 df_b_g = df_b.copy(); df_b_g.insert(0, "ID", df_b_g.index + 2)
                 st.table(df_b_g[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
-                o_id = st.number_input("İşlem ID:", min_value=2, step=1)
-                if st.button("✅ ONAYLA"):
+                o_id = st.number_input("Onay ID:", min_value=2, step=1)
+                if st.button("✅ SEÇİLENİ ONAYLA"):
                     requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(o_id)}))
-                    st.success("Onaylandı!")
-            else: st.info("Bekleyen yok.")
+                    st.success("İşlem Başarılı!")
+            else: st.info("Onay bekleyen kayıt yok.")
 
-        with t[1]: # Takvim (Renkli)
+        with t[1]: # Takvim
             events = []
             if not df_o.empty:
                 for _, row in df_o.iterrows():
@@ -196,54 +164,60 @@ else:
                     except: continue
             calendar(events=events, options={"locale": "tr"})
 
-       with t[2]: # Karne
+        with t[2]: # Karne
             if not df_o.empty:
                 ay_list = sorted(df_o['Ay'].dropna().unique(), reverse=True)
                 if ay_list:
-                    ay_sec = st.selectbox("Ay Seç", ay_list)
+                    ay_sec = st.selectbox("Ay Seçin", ay_list)
                     k_df = df_o[df_o['Ay']==ay_sec].groupby([ad_c,'Tür'])[['G','S']].sum()
                     
-                    # --- EKRAN FORMATLAMA ---
-                    ekran_df = k_df.copy()
-                    ekran_df['G'] = ekran_df['G'].apply(lambda x: f"{str(round(x,1)).replace('.',',')} Gün" if x > 0 else "-")
-                    ekran_df['S'] = ekran_df['S'].apply(lambda x: f"{str(round(x,2)).replace('.',',')} Saat" if x > 0 else "-")
+                    # Ekranda Birimli Görünüm
+                    ek_df = k_df.copy()
+                    ek_df['G'] = ek_df['G'].apply(lambda x: f"{str(round(x,1)).replace('.',',')} Gün" if x > 0 else "-")
+                    ek_df['S'] = ek_df['S'].apply(lambda x: f"{str(round(x,2)).replace('.',',')} Saat" if x > 0 else "-")
+                    st.dataframe(ek_df, use_container_width=True)
                     
-                    st.dataframe(ekran_df, use_container_width=True)
-                    
-                    # PDF İndirme
-                    pdf = pdf_olustur(k_df, ay_sec)
-                    st.download_button("📥 PDF OLARAK İNDİR", data=pdf, file_name=f"Karne_{ay_sec}.pdf", mime="application/pdf")
+                    # PDF Butonu
+                    pdf_v = pdf_olustur(k_df, ay_sec)
+                    st.download_button("📥 KARNEYİ PDF İNDİR", data=pdf_v, file_name=f"Karne_{ay_sec}.pdf", mime="application/pdf")
 
         with t[3]: # Sicil
-            ps = st.selectbox("Personel", p_listesi)
-            if not df_o.empty: st.dataframe(df_o[df_o[ad_c]==ps][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
+            ps = st.selectbox("Personel Seç", p_listesi, key="sicil_p")
+            if not df_o.empty:
+                s_df = df_o[df_o[ad_c]==ps][['Başlangıç','Dönüş','Tür','G','S']]
+                st.dataframe(s_df, use_container_width=True)
 
         with t[4]: # Yıllık İzin
-            py = st.selectbox("Personel Seç", p_listesi)
-            gt = datetime.strptime(PERSONEL_GIRISLERI.get(py, "2024-01-01"), "%Y-%m-%d")
-            kidem = datetime.now().year - gt.year
-            hk, ku = hakedis_bul(kidem), (df_o[(df_o[ad_c]==py) & (df_o['Tür'].str.contains("Yıllık"))]['G'].sum() if not df_o.empty else 0)
-            st.metric("Kalan İzin", f"{hk-ku} Gün")
+            py = st.selectbox("Personel", p_listesi, key="y_iz_p")
+            gt_s = PERSONEL_GIRISLERI.get(py, "2024-01-01")
+            gt = datetime.strptime(gt_s, "%Y-%m-%d")
+            kd = datetime.now().year - gt.year
+            hk = hakedis_bul(kd)
+            ku = df_o[(df_o[ad_c]==py) & (df_o['Tür'].str.contains("Yıllık"))]['G'].sum() if not df_o.empty else 0
+            st.metric("Kalan Yıllık İzin", f"{hk-ku} Gün")
 
-        with t[5]: # Manuel
-            ma = st.selectbox("Personel", p_listesi, key="m_a")
-            mt = st.selectbox("Tür", IZ, key="m_t")
-            mt1 = st.date_input("Tarih", key="m_d1")
-            mt2 = st.date_input("Dönüş", key="m_d2")
-            if st.button("KAYDET"):
+        with t[5]: # Manuel Giriş
+            ma = st.selectbox("Personel", p_listesi, key="man_p")
+            mt = st.selectbox("Tür", IZ, key="man_t")
+            mt1 = st.date_input("Başlangıç", key="man_d1")
+            mt2 = st.date_input("Dönüş/İşbaşı", key="man_d2")
+            if st.button("SİSTEME ONAYLI İŞLE"):
                 requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ma,"tur":f"{mt} (Tam Gün)","bas":mt1.strftime(F_TARIH),"bit":mt2.strftime(F_TARIH), "durum": "Onaylandı"}))
-                st.success("Eklendi.")
+                st.success("Kayıt başarıyla eklendi.")
 
         with t[6]: # Geç Kalma
-            ga, gt, gd = st.selectbox("Personel", p_listesi, key="g_a"), st.date_input("Tarih", key="g_d"), st.slider("Dakika", 1, 60, 15)
-            if st.button("İŞLE"):
+            ga = st.selectbox("Personel", p_listesi, key="gec_p")
+            gt = st.date_input("Tarih", key="gec_d")
+            gd = st.slider("Dakika", 1, 60, 15)
+            if st.button("GEÇ KALMAYI İŞLE"):
                 requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ga,"tur":"Geç Kalma","bas":f"{gt.strftime(F_TARIH)} 09:00","bit":f"{gt.strftime(F_TARIH)} 09:{gd:02d}", "durum": "Onaylandı"}))
-                st.success("İşlendi.")
+                st.success("İşlem kaydedildi.")
 
         with t[7]: # Liste/Sil
             if not df_all.empty:
-                df_l = df_all.copy(); df_l.insert(0, "ID", df_l.index + 2); st.dataframe(df_l, use_container_width=True)
-                sid = st.number_input("Silinecek ID:", min_value=2)
-                if st.button("SİL"):
+                df_l = df_all.copy(); df_l.insert(0, "ID", df_l.index + 2)
+                st.dataframe(df_l, use_container_width=True)
+                sid = st.number_input("Silinecek ID:", min_value=2, step=1)
+                if st.button("🗑️ KAYDI KALICI OLARAK SİL"):
                     requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sid)}))
-                    st.error("Silindi.")
+                    st.error("Kayıt silindi.")
