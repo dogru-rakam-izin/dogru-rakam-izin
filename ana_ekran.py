@@ -15,23 +15,17 @@ from reportlab.lib.styles import getSampleStyleSheet
 def sure_formatla(deger, tip="G"):
     if deger == 0 or pd.isna(deger):
         return "-"
-    
     if tip == "G":
-        # 2.0 -> 2 Gün, 1.5 -> 1,5 Gün
         s = str(round(deger, 1)).replace('.', ',')
         if s.endswith(',0'): s = s[:-2]
         return f"{s} Gün"
     else:
-        # Saat ve Dakika hesaplama (Örn: 0.67 -> 40 Dakika)
         toplam_dakika = round(deger * 60)
         saat = toplam_dakika // 60
         dakika = toplam_dakika % 60
-        
         sonuc = ""
-        if saat > 0:
-            sonuc += f"{saat} Saat "
-        if dakika > 0:
-            sonuc += f"{dakika} Dakika"
+        if saat > 0: sonuc += f"{saat} Saat "
+        if dakika > 0: sonuc += f"{dakika} Dakika"
         return sonuc.strip()
 
 # --- PDF FONKSİYONU ---
@@ -39,34 +33,25 @@ def pdf_olustur(df, secili_ay):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     elements = []
-    
     def tr_duzelt(metin):
         return str(metin).replace('İ', 'I').replace('ı', 'i').replace('Ş', 'S').replace('ş', 's').replace('Ğ', 'G').replace('ğ', 'g').replace('Ü', 'U').replace('ü', 'u').replace('Ö', 'O').replace('ö', 'o').replace('Ç', 'C').replace('ç', 'c')
-
     styles = getSampleStyleSheet()
     title = Paragraph(f"<b>{tr_duzelt(secili_ay)} - Personel Izin Karnesi</b>", styles['Title'])
     elements.append(title)
-    
     data = [["Ad Soyad", "Izin Turu", "Gun", "Saat/Dakika"]]
     for idx, row in df.iterrows():
-        gun_m = sure_formatla(row['G'], "G")
-        saat_m = sure_formatla(row['S'], "S")
-        data.append([tr_duzelt(idx[0]), tr_duzelt(idx[1]), gun_m, saat_m])
-    
+        data.append([tr_duzelt(idx[0]), tr_duzelt(idx[1]), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
     table = Table(data, colWidths=[160, 140, 80, 100])
     table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.darkred),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.darkred), ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'), ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black), ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
     ]))
     elements.append(table)
     doc.build(elements)
     return buffer.getvalue()
 
-# --- AYARLAR VE VERİ ---
+# --- AYARLAR ---
 URL = "https://script.google.com/macros/s/AKfycbwp1CNfE5Lp9kKbFF99MvwX3PAwO2Y85NAWu5SCdj5TnhNnan7r-VBDEW9ONF9OqkuV/exec"
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
 CSV = f"https://docs.google.com/spreadsheets/d/{S_ID}/gviz/tq?tqx=out:csv"
@@ -89,6 +74,12 @@ PERSONEL_GIRISLERI = {
     "SİDAL ZENGİN": "2025-11-17", "SELEN ŞEN": "2025-11-03"
 }
 
+def hakedis_bul(yil):
+    if yil < 1: return 0
+    if yil < 5: return 14
+    if yil < 15: return 20
+    return 26
+
 def yukle():
     try:
         df = pd.read_csv(CSV)
@@ -109,10 +100,8 @@ def yukle():
                     b, d = datetime.strptime(b_str[:10], F_TARIH), datetime.strptime(d_str[:10], F_TARIH)
                     return (d-b).days, 0
             except: return 0, 0
-
         df_b = df[df[durum_col].str.contains("Bekliyor", case=False, na=True)].copy()
         df_o = df[df[durum_col].str.contains("Onaylandı", case=False, na=False)].copy()
-        
         if not df_o.empty:
             res = df_o.apply(lambda r: pd.Series(h(r)), axis=1)
             df_o['G'], df_o['S'] = res[0].astype(float), res[1].astype(float)
@@ -136,10 +125,9 @@ if menu == "👤 PERSONEL GİRİŞİ":
     p_bas_f, p_bit_f = "", ""
     if p_tp == "Saatlik":
         c1, c2 = st.columns(2)
-        p_s1 = c1.time_input("Çıkış", value=datetime.strptime("09:00", "%H:%M").time(), key="p_s1")
-        p_s2 = c2.time_input("Dönüş", value=datetime.strptime("10:00", "%H:%M").time(), key="p_s2")
-        p_bas_f = f"{p_t1.strftime(F_TARIH)} {p_s1.strftime(F_SAAT)}"
-        p_bit_f = f"{p_t1.strftime(F_TARIH)} {p_s2.strftime(F_SAAT)}"
+        p_s1 = c1.time_input("Çıkış", value=datetime.strptime("09:00", "%H:%M").time())
+        p_s2 = c2.time_input("Dönüş", value=datetime.strptime("10:00", "%H:%M").time())
+        p_bas_f, p_bit_f = f"{p_t1.strftime(F_TARIH)} {p_s1.strftime(F_SAAT)}", f"{p_t1.strftime(F_TARIH)} {p_s2.strftime(F_SAAT)}"
     else:
         p_dn = st.date_input("İş Başı Tarihi", key="p_dn")
         p_bas_f, p_bit_f = p_t1.strftime(F_TARIH), p_dn.strftime(F_TARIH)
@@ -176,29 +164,59 @@ else:
                     except: continue
             calendar(events=events, options={"locale": "tr"})
 
-        with t[2]: # Karne (NORMAL YAZIM BURADA)
+        with t[2]: # Karne
             if not df_o.empty:
                 ay_list = sorted(df_o['Ay'].dropna().unique(), reverse=True)
                 if ay_list:
-                    ay_sec = st.selectbox("Ay Seçin", ay_list)
+                    ay_sec = st.selectbox("Ay Seç", ay_list)
                     k_df = df_o[df_o['Ay']==ay_sec].groupby([ad_c,'Tür'])[['G','S']].sum()
-                    
-                    # Ekranda İnsani Yazım
                     ek_df = k_df.copy()
                     ek_df['G'] = ek_df['G'].apply(lambda x: sure_formatla(x, "G"))
                     ek_df['S'] = ek_df['S'].apply(lambda x: sure_formatla(x, "S"))
                     st.dataframe(ek_df, use_container_width=True)
-                    
-                    # PDF Butonu
                     pdf_v = pdf_olustur(k_df, ay_sec)
                     st.download_button("📥 PDF İNDİR", data=pdf_v, file_name=f"Karne_{ay_sec}.pdf", mime="application/pdf")
 
         with t[3]: # Sicil
-            ps = st.selectbox("Personel", p_listesi)
+            ps = st.selectbox("Personel Seç", p_listesi, key="sicil_p")
             if not df_o.empty:
                 s_df = df_o[df_o[ad_c]==ps][['Başlangıç','Dönüş','Tür','G','S']].copy()
                 s_df['G'] = s_df['G'].apply(lambda x: sure_formatla(x, "G"))
                 s_df['S'] = s_df['S'].apply(lambda x: sure_formatla(x, "S"))
                 st.dataframe(s_df, use_container_width=True)
-        
-        # ... Diğer sekmeler (Yıllık İzin, Manuel, Geç Kalma, Liste) aynen kalabilir ...
+
+        with t[4]: # Yıllık İzin
+            py = st.selectbox("Yıllık İzin Kontrol", p_listesi)
+            gt = datetime.strptime(PERSONEL_GIRISLERI.get(py, "2024-01-01"), "%Y-%m-%d")
+            kd = datetime.now().year - gt.year - ((datetime.now().month, datetime.now().day) < (gt.month, gt.day))
+            hk = hakedis_bul(max(0, kd))
+            ku = df_o[(df_o[ad_c]==py) & (df_o['Tür'].str.contains("Yıllık"))]['G'].sum() if not df_o.empty else 0
+            c1, c2 = st.columns(2)
+            c1.metric("Toplam Hakediş", f"{hk} Gün")
+            c2.metric("Kalan İzin", f"{hk-ku} Gün")
+
+        with t[5]: # Manuel Giriş
+            ma = st.selectbox("Personel", p_listesi, key="m_a")
+            mt = st.selectbox("İzin Türü", IZ, key="m_t")
+            mt1 = st.date_input("Başlangıç Tarihi", key="m_d1")
+            mt2 = st.date_input("Dönüş Tarihi", key="m_d2")
+            if st.button("MANUEL ONAYLI EKLE"):
+                requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ma,"tur":f"{mt} (Tam Gün)","bas":mt1.strftime(F_TARIH),"bit":mt2.strftime(F_TARIH), "durum": "Onaylandı"}))
+                st.success("Kayıt eklendi.")
+
+        with t[6]: # Geç Kalma
+            ga = st.selectbox("Personel", p_listesi, key="g_a")
+            gt = st.date_input("Geç Kalma Tarihi", key="g_d")
+            gd = st.slider("Kaç Dakika Geç Kaldı?", 1, 120, 15)
+            if st.button("GEÇ KALMAYI KAYDET"):
+                requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ga,"tur":"Geç Kalma","bas":f"{gt.strftime(F_TARIH)} 09:00","bit":f"{gt.strftime(F_TARIH)} 09:{gd:02d}", "durum": "Onaylandı"}))
+                st.success("Geç kalma işlendi.")
+
+        with t[7]: # Liste / Sil
+            if not df_all.empty:
+                df_l = df_all.copy(); df_l.insert(0, "ID", df_l.index + 2)
+                st.dataframe(df_l, use_container_width=True)
+                sid = st.number_input("Silinecek Satır ID:", min_value=2, step=1)
+                if st.button("❌ KAYDI SİL"):
+                    requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sid)}))
+                    st.error("Kayıt silindi.")
