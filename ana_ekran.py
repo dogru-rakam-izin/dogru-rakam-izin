@@ -9,6 +9,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
+import urllib.parse
 
 # --- 1. YARDIMCI FONKSİYONLAR ---
 def sure_formatla(deger, tip="G"):
@@ -78,7 +79,6 @@ def hakedis_bul(yil):
     if yil < 15: return 20
     return 26
 
-@st.cache_data(ttl=60)
 def yukle():
     try:
         df = pd.read_csv(CSV)
@@ -138,6 +138,11 @@ if menu == "👤 PERSONEL GİRİŞİ":
     if st.button("TALEBİ GÖNDER", use_container_width=True):
         requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":p_ad,"tur":f"{p_tur} ({p_tp})","bas":p_bas_f,"bit":p_bit_f, "durum": "Onay Bekliyor"}))
         st.success("Talebiniz başarıyla iletildi.")
+        
+        # WHATSAPP PAYLAŞIM
+        mesaj = f"*YENİ İZİN TALEBİ*\n👤 *Personel:* {p_ad}\n📝 *Tür:* {p_tur}\n📅 *Başlangıç:* {p_bas_f}\n🔙 *Dönüş:* {p_bit_f}"
+        wp_url = f"https://wa.me/?text={urllib.parse.quote(mesaj)}"
+        st.markdown(f'<a href="{wp_url}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:10px;text-align:center;border-radius:5px;">📢 WHATSAPP İLE YÖNETİCİYE BİLDİR</div></a>', unsafe_allow_html=True)
 
 else:
     sifre = st.sidebar.text_input("Yönetici Şifresi", type="password")
@@ -158,24 +163,21 @@ else:
 
         with t[1]: # Takvim (Geliştirilmiş Görünüm)
             st.subheader("İzin ve Geç Kalma Takvimi")
-            events = []
+            evs = []
             if not df_o.empty:
-                for _, row in df_o.iterrows():
+                for _, r in df_o.iterrows():
                     try:
-                        b_str, d_str = str(row['Başlangıç']).strip(), str(row['Dönüş']).strip()
-                        is_all_day = len(b_str) <= 10
-                        fmt = F_TARIH if is_all_day else F_TAM
-                        start = datetime.strptime(b_str, fmt).isoformat()
-                        end = datetime.strptime(d_str, fmt).isoformat()
-                        
-                        color = "#3D9DF3" # Mavi (Genel)
-                        if "Yıllık" in str(row['Tür']): color = "#FF4B4B" # Kırmızı
-                        if "Geç Kalma" in str(row['Tür']): color = "#FFA500" # Turuncu
-                        
-                        events.append({"title": f"{row[ad_c]} - {row['Tür']}", "start": start, "end": end, "allDay": is_all_day, "backgroundColor": color})
+                        b_s, d_s = str(r['Başlangıç']).strip(), str(r['Dönüş']).strip()
+                        is_all = len(b_s) <= 10
+                        evs.append({
+                            "title": f"{r[ad_c]} ({r['Tür']})",
+                            "start": datetime.strptime(b_s, F_TARIH if is_all else F_TAM).isoformat(),
+                            "end": datetime.strptime(d_s, F_TARIH if is_all else F_TAM).isoformat(),
+                            "allDay": is_all,
+                            "color": "#FF4B4B" if "Yıllık" in str(r['Tür']) else "#FFA500" if "Geç Kalma" in str(r['Tür']) else "#3D9DF3"
+                        })
                     except: continue
-            
-            calendar(events=events, options={"locale": "tr", "initialView": "dayGridMonth", "headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek,listWeek"}}, key="cal_v3")
+            calendar(events=evs, options={"locale":"tr", "headerToolbar":{"left":"prev,next today","center":"title","right":"dayGridMonth,timeGridWeek"}}, key="takvim_final")
 
         with t[2]: # Karne
             if not df_o.empty:
@@ -207,17 +209,17 @@ else:
             ku = df_o[(df_o[ad_c]==py) & (df_o['Tür'].str.contains("Yıllık"))]['G'].sum() if not df_o.empty else 0
             st.metric("Kalan Yıllık İzin", f"{hk-ku} Gün")
 
-        with t[5]: # Manuel (SAAT VE DAKİKA EKLENDİ)
+        with t[5]: # Manuel (Saatli İzin Düzeltildi)
             ma = st.selectbox("Personel", p_listesi, key="m_a")
             mt = st.selectbox("Tür", IZIN_TURLERI, key="m_t")
-            m_tip = st.radio("Kayıt Tipi", ["Tam Gün", "Saatlik"], horizontal=True)
+            m_tip = st.radio("Kayıt Tipi", ["Tam Gün", "Saatlik"], horizontal=True, key="m_tip")
             mt1 = st.date_input("Tarih / Başlangıç", key="m_d1")
             
             m_bas_str, m_bit_str = "", ""
             if m_tip == "Saatlik":
                 c1, c2 = st.columns(2)
-                ms1 = c1.time_input("Çıkış Saati", value=datetime.strptime("09:00", "%H:%M").time())
-                ms2 = c2.time_input("Dönüş Saati", value=datetime.strptime("10:00", "%H:%M").time())
+                ms1 = c1.time_input("Çıkış Saati", value=datetime.strptime("09:00", "%H:%M").time(), key="ms1")
+                ms2 = c2.time_input("Dönüş Saati", value=datetime.strptime("10:00", "%H:%M").time(), key="ms2")
                 m_bas_str = f"{mt1.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}"
                 m_bit_str = f"{mt1.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}"
             else:
@@ -227,7 +229,7 @@ else:
                 
             if st.button("MANUEL ONAYLI KAYDET"):
                 requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ma,"tur":f"{mt} ({m_tip})","bas":m_bas_str,"bit":m_bit_str, "durum": "Onaylandı"}))
-                st.success("Kayıt Başarıyla Sisteme İşlendi.")
+                st.success("Sisteme işlendi.")
                 st.rerun()
 
         with t[6]: # Geç Kalma
@@ -236,7 +238,7 @@ else:
             gd = st.slider("Dakika", 1, 120, 15)
             if st.button("SİSTEME İŞLE"):
                 requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ga,"tur":"Geç Kalma","bas":f"{gt.strftime(F_TARIH)} 09:00","bit":f"{gt.strftime(F_TARIH)} 09:{gd:02d}", "durum": "Onaylandı"}))
-                st.success("Geç kalma işlendi.")
+                st.success("İşlendi.")
                 st.rerun()
 
         with t[7]: # Liste
@@ -247,7 +249,5 @@ else:
                 sid = st.number_input("Silinecek ID:", min_value=2, step=1)
                 if st.button("KAYDI SİL"):
                     requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sid)}))
-                    st.error("Kayıt silindi.")
+                    st.error("Silindi.")
                     st.rerun()
-    else:
-        if sifre: st.sidebar.error("Hatalı Şifre!")
