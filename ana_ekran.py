@@ -137,79 +137,41 @@ if menu == "👤 PERSONEL GİRİŞİ":
             st.success("Talebiniz iletildi.")
 
 else:
+    else:
     if st.sidebar.text_input("Şifre", type="password") == "2020":
         t = st.tabs(["🔔 Onay", "📅 Takvim", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel", "⏰ Geç Kalma", "🗑️ Liste"])
         
-        with t[0]: # Onay
+        with t[0]: # 🔔 ONAY
             if not df_b.empty:
-                df_b_g = df_b.copy(); df_b_g.insert(0, "ID", df_b_g.index + 2)
+                df_b_g = df_b.copy()
+                df_b_g.insert(0, "ID", df_b_g.index + 2)
                 st.table(df_b_g[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
                 o_id = st.number_input("Onay ID:", min_value=2, step=1)
                 if st.button("✅ ONAYLA"):
                     requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(o_id)}))
                     st.success("Onaylandı!")
-            else: st.info("Bekleyen yok.")
+            else:
+                st.info("Bekleyen onay bulunmuyor.")
 
-       with t[1]: # 📅 TAKVİM GÖRÜNÜMÜ
-            st.subheader("İzin Takvimi")
+        with t[1]: # 📅 TAKVİM
             events = []
             if not df_o.empty:
                 for _, row in df_o.iterrows():
                     try:
-                        # Tarih verilerini string'e çevir ve temizle
-                        b_str = str(row['Başlangıç']).strip()
-                        d_str = str(row['Dönüş']).strip()
-                        
-                        # Saatlik mi yoksa Tam Gün mü kontrolü (Karakter sayısına göre)
-                        if len(b_str) > 10: 
-                            # Saatlik/Geç Kalma Formatı: 25/03/2026 09:00
-                            start_dt = datetime.strptime(b_str, F_TAM)
-                            end_dt = datetime.strptime(d_str, F_TAM)
-                            all_day = False
-                        else:
-                            # Tam Gün Formatı: 25/03/2026
-                            start_dt = datetime.strptime(b_str, F_TARIH)
-                            end_dt = datetime.strptime(d_str, F_TARIH)
-                            all_day = True
-                        
-                        # Renk Belirleme
-                        tur = str(row['Tür'])
-                        if "Yıllık" in tur:
-                            renk = "#FF4B4B" # Kırmızı
-                        elif "Geç Kalma" in tur:
-                            renk = "#FFA500" # Turuncu
-                        else:
-                            renk = "#3D9DF3" # Mavi
-                        
-                        # Takvim etkinliğini listeye ekle
-                        events.append({
-                            "title": f"{row[ad_c]} ({tur})",
-                            "start": start_dt.isoformat(),
-                            "end": end_dt.isoformat(),
-                            "allDay": all_day,
-                            "color": renk
-                        })
-                    except Exception as e:
-                        continue # Hatalı satırı atla
-            
-            # Takvimi görüntüle
-            calendar_options = {
-                "headerToolbar": {
-                    "left": "prev,next today",
-                    "center": "title",
-                    "right": "dayGridMonth,timeGridWeek,listWeek",
-                },
-                "initialView": "dayGridMonth",
-                "locale": "tr",
-            }
-            
-            calendar(events=events, options=calendar_options, key="izin_takvimi")
+                        b_str, d_str = str(row['Başlangıç']).strip(), str(row['Dönüş']).strip()
+                        all_day = len(b_str) <= 10
+                        start = datetime.strptime(b_str, F_TARIH if all_day else F_TAM).isoformat()
+                        end = datetime.strptime(d_str, F_TARIH if all_day else F_TAM).isoformat()
+                        renk = "#FF4B4B" if "Yıllık" in row['Tür'] else "#FFA500" if "Geç Kalma" in row['Tür'] else "#3D9DF3"
+                        events.append({"title": f"{row[ad_c]} ({row['Tür']})", "start": start, "end": end, "allDay": all_day, "color": renk})
+                    except: continue
+            calendar(events=events, options={"locale": "tr", "headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek"}}, key="takvim_yeni")
 
-        with t[2]: # Karne
+        with t[2]: # 📊 KARNE
             if not df_o.empty:
                 ay_list = sorted(df_o['Ay'].dropna().unique(), reverse=True)
                 if ay_list:
-                    ay_sec = st.selectbox("Ay Seç", ay_list)
+                    ay_sec = st.selectbox("Ay Seçin", ay_list)
                     k_df = df_o[df_o['Ay']==ay_sec].groupby([ad_c,'Tür'])[['G','S']].sum()
                     ek_df = k_df.copy()
                     ek_df['G'] = ek_df['G'].apply(lambda x: sure_formatla(x, "G"))
@@ -218,46 +180,46 @@ else:
                     pdf_v = pdf_olustur(k_df, ay_sec)
                     st.download_button("📥 PDF İNDİR", data=pdf_v, file_name=f"Karne_{ay_sec}.pdf", mime="application/pdf")
 
-        with t[3]: # Sicil
-            ps = st.selectbox("Personel Seç", p_listesi, key="sicil_p")
+        with t[3]: # 📄 SİCİL
+            ps = st.selectbox("Personel", p_listesi, key="sicil_p")
             if not df_o.empty:
                 s_df = df_o[df_o[ad_c]==ps][['Başlangıç','Dönüş','Tür','G','S']].copy()
                 s_df['G'] = s_df['G'].apply(lambda x: sure_formatla(x, "G"))
                 s_df['S'] = s_df['S'].apply(lambda x: sure_formatla(x, "S"))
                 st.dataframe(s_df, use_container_width=True)
 
-        with t[4]: # Yıllık İzin
-            py = st.selectbox("Yıllık İzin Kontrol", p_listesi)
-            gt = datetime.strptime(PERSONEL_GIRISLERI.get(py, "2024-01-01"), "%Y-%m-%d")
+        with t[4]: # 📅 YILLIK İZİN
+            py = st.selectbox("Yıllık İzin Kontrol", p_listesi, key="yiz_p")
+            gt_s = PERSONEL_GIRISLERI.get(py, "2024-01-01")
+            gt = datetime.strptime(gt_s, "%Y-%m-%d")
             kd = datetime.now().year - gt.year - ((datetime.now().month, datetime.now().day) < (gt.month, gt.day))
             hk = hakedis_bul(max(0, kd))
             ku = df_o[(df_o[ad_c]==py) & (df_o['Tür'].str.contains("Yıllık"))]['G'].sum() if not df_o.empty else 0
-            c1, c2 = st.columns(2)
-            c1.metric("Toplam Hakediş", f"{hk} Gün")
-            c2.metric("Kalan İzin", f"{hk-ku} Gün")
+            st.metric("Kalan İzin", f"{hk-ku} Gün")
 
-        with t[5]: # Manuel Giriş
-            ma = st.selectbox("Personel", p_listesi, key="m_a")
-            mt = st.selectbox("İzin Türü", IZ, key="m_t")
-            mt1 = st.date_input("Başlangıç Tarihi", key="m_d1")
-            mt2 = st.date_input("Dönüş Tarihi", key="m_d2")
-            if st.button("MANUEL ONAYLI EKLE"):
+        with t[5]: # 📝 MANUEL
+            ma = st.selectbox("Personel", p_listesi, key="m_p")
+            mt = st.selectbox("Tür", IZ, key="m_t")
+            mt1 = st.date_input("Başlangıç", key="m_d1")
+            mt2 = st.date_input("Dönüş", key="m_d2")
+            if st.button("SİSTEME İŞLE"):
                 requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ma,"tur":f"{mt} (Tam Gün)","bas":mt1.strftime(F_TARIH),"bit":mt2.strftime(F_TARIH), "durum": "Onaylandı"}))
                 st.success("Kayıt eklendi.")
 
-        with t[6]: # Geç Kalma
-            ga = st.selectbox("Personel", p_listesi, key="g_a")
-            gt = st.date_input("Geç Kalma Tarihi", key="g_d")
-            gd = st.slider("Kaç Dakika Geç Kaldı?", 1, 120, 15)
-            if st.button("GEÇ KALMAYI KAYDET"):
+        with t[6]: # ⏰ GEÇ KALMA
+            ga = st.selectbox("Personel", p_listesi, key="g_p")
+            gt = st.date_input("Tarih", key="g_t")
+            gd = st.slider("Dakika", 1, 120, 15)
+            if st.button("GEÇ KALMAYI İŞLE"):
                 requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ga,"tur":"Geç Kalma","bas":f"{gt.strftime(F_TARIH)} 09:00","bit":f"{gt.strftime(F_TARIH)} 09:{gd:02d}", "durum": "Onaylandı"}))
-                st.success("Geç kalma işlendi.")
+                st.success("İşlendi.")
 
-        with t[7]: # Liste / Sil
+        with t[7]: # 🗑️ LİSTE/SİL
             if not df_all.empty:
-                df_l = df_all.copy(); df_l.insert(0, "ID", df_l.index + 2)
+                df_l = df_all.copy()
+                df_l.insert(0, "ID", df_l.index + 2)
                 st.dataframe(df_l, use_container_width=True)
-                sid = st.number_input("Silinecek Satır ID:", min_value=2, step=1)
-                if st.button("❌ KAYDI SİL"):
+                sid = st.number_input("Silinecek ID:", min_value=2, step=1)
+                if st.button("KAYDI SİL"):
                     requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sid)}))
                     st.error("Kayıt silindi.")
