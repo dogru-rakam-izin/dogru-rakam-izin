@@ -2,9 +2,14 @@ import streamlit as st
 import pandas as pd
 import requests
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 import urllib.parse
-from streamlit_calendar import calendar # Takvim için gerekli
+from io import BytesIO
+from streamlit_calendar import calendar
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
 
 # --- AYARLAR ---
 URL = "https://script.google.com/macros/s/AKfycbwp1CNfE5Lp9kKbFF99MvwX3PAwO2Y85NAWu5SCdj5TnhNnan7r-VBDEW9ONF9OqkuV/exec"
@@ -14,10 +19,34 @@ LOGO_URL = "https://i.ibb.co/8LG243NJ/LOGO.png"
 
 st.set_page_config(page_title="Doğru Rakam İzin Paneli", layout="wide", page_icon=LOGO_URL)
 
-# --- TASARIM ---
-st.markdown(f"<div style='text-align: center;'><img src='{LOGO_URL}' width='350'></div>", unsafe_allow_html=True)
-st.markdown("<br>", unsafe_allow_html=True)
+# --- PDF OLUŞTURMA FONKSİYONU ---
+def pdf_olustur(df, secili_ay):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    elements = []
+    styles = getSampleStyleSheet()
+    title = Paragraph(f"<b>{secili_ay} - Personel Izin Karnesi</b>", styles['Title'])
+    elements.append(title)
+    
+    # Tablo verisi hazırlama
+    data = [["Ad Soyad", "Izin Turu", "Gun", "Saat"]]
+    for idx, row in df.iterrows():
+        data.append([str(idx[0]), str(idx[1]), str(row['G']), str(row['S'])])
+    
+    table = Table(data)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.darkred),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+    ]))
+    elements.append(table)
+    doc.build(elements)
+    return buffer.getvalue()
 
+# --- TASARIM VE AYARLAR ---
 F_TARIH, F_SAAT, F_TAM = '%d/%m/%Y', '%H:%M', '%d/%m/%Y %H:%M'
 TR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
 IZ = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim", "Geç Kalma"]
@@ -74,6 +103,7 @@ def yukle():
 df_all, df_b, df_o, ad_c = yukle()
 p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
 
+st.markdown(f"<div style='text-align: center;'><img src='{LOGO_URL}' width='350'></div>", unsafe_allow_html=True)
 menu = st.sidebar.radio("📌 MENÜ", ["👤 PERSONEL GİRİŞİ", "🔐 YÖNETİCİ PANELİ"])
 
 if menu == "👤 PERSONEL GİRİŞİ":
@@ -81,136 +111,90 @@ if menu == "👤 PERSONEL GİRİŞİ":
     p_ad = st.selectbox("Ad Soyad Seçiniz", p_listesi, key="p_ad").upper()
     p_tur = st.selectbox("İzin Türü", IZ, key="p_tur")
     p_tp = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], horizontal=True, key="p_tp")
-    p_t1 = st.date_input("İzin Günü / Başlangıç Tarihi", key="p_t1")
+    p_t1 = st.date_input("Başlangıç Tarihi", key="p_t1")
     p_bas_f, p_bit_f = "", ""
     if p_tp == "Saatlik":
         c1, c2 = st.columns(2)
-        p_s1 = c1.time_input("Çıkış Saati", value=datetime.strptime("09:00", "%H:%M").time(), key="p_s1")
-        p_s2 = c2.time_input("Dönüş Saati", value=datetime.strptime("10:00", "%H:%M").time(), key="p_s2")
+        p_s1 = c1.time_input("Çıkış", value=datetime.strptime("09:00", "%H:%M").time(), key="p_s1")
+        p_s2 = c2.time_input("Dönüş", value=datetime.strptime("10:00", "%H:%M").time(), key="p_s2")
         p_bas_f = f"{p_t1.strftime(F_TARIH)} {p_s1.strftime(F_SAAT)}"
         p_bit_f = f"{p_t1.strftime(F_TARIH)} {p_s2.strftime(F_SAAT)}"
     else:
-        p_dn = st.date_input("İş Başı Tarihi (Dönüş)", key="p_dn")
+        p_dn = st.date_input("İş Başı Tarihi", key="p_dn")
         p_bas_f, p_bit_f = p_t1.strftime(F_TARIH), p_dn.strftime(F_TARIH)
-    with st.form("p_submit_form"):
-        if st.form_submit_button("TALEBİ SİSTEME GÖNDER", use_container_width=True):
+    with st.form("p_submit"):
+        if st.form_submit_button("TALEBİ GÖNDER", use_container_width=True):
             requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":p_ad,"tur":f"{p_tur} ({p_tp})","bas":p_bas_f,"bit":p_bit_f, "durum": "Onay Bekliyor"}))
-            st.session_state['wa_p_talep'] = f"📄 *YENİ İZİN TALEBİ*\n👤 *Personel:* {p_ad}\n📋 *Tür:* {p_tur} ({p_tp})\n🗓 *Zaman:* {p_bas_f} - {p_bit_f}\n\n*Onayınızı bekliyorum.*"
-            st.success("Talebiniz iletildi.")
-    if 'wa_p_talep' in st.session_state:
-        st.link_button("🟢 YÖNETİCİYE WHATSAPP'TAN BİLDİR", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_p_talep'])}", use_container_width=True)
+            st.success("İletildi.")
 
 else:
     if st.sidebar.text_input("Şifre", type="password") == "2020":
-        # TAKVİM SEKMESİ BURAYA EKLENDİ
-        t = st.tabs(["🔔 Onay Bekleyenler", "📅 Takvim", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel Giriş", "⏰ Geç Kalma", "🗑️ Liste/Sil"])
+        t = st.tabs(["🔔 Onay", "📅 Takvim", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel", "⏰ Geç Kalma", "🗑️ Liste"])
         
         with t[0]: # Onay
             if not df_b.empty:
                 df_b_g = df_b.copy(); df_b_g.insert(0, "ID", df_b_g.index + 2)
                 st.table(df_b_g[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
-                c1, c2 = st.columns(2); o_id = c1.number_input("İşlem ID:", min_value=2, step=1, key="adm_on_id")
-                if c2.button("✅ ONAYLA"):
-                    sec = df_b_g[df_b_g["ID"] == o_id]
-                    if not sec.empty:
-                        pa, pt, pb, pd = sec[ad_c].values[0], sec["Tür"].values[0], sec["Başlangıç"].values[0], sec["Dönüş"].values[0]
-                        requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(o_id)}))
-                        st.session_state['wa_adm_onay'] = f"✅ *SAYIN {pa},*\n🗓 *{pb} - {pd}*\n📋 *{pt}* talebiniz onaylanmıştır."
-                        st.success(f"{pa} onaylandı!")
-                if 'wa_adm_onay' in st.session_state:
-                    st.link_button("🟢 ONAY MESAJINI GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_adm_onay'])}", use_container_width=True)
+                o_id = st.number_input("İşlem ID:", min_value=2, step=1)
+                if st.button("✅ ONAYLA"):
+                    requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(o_id)}))
+                    st.success("Onaylandı!")
             else: st.info("Bekleyen yok.")
 
-        with t[1]: # 📅 TAKVİM GÖRÜNÜMÜ
-            st.subheader("İzin Takvimi")
+        with t[1]: # Takvim (Renkli)
             events = []
             if not df_o.empty:
                 for _, row in df_o.iterrows():
                     try:
                         b_str, d_str = str(row['Başlangıç']), str(row['Dönüş'])
-                        if len(b_str) > 10: # Saatlik veya Geç Kalma
-                            start = datetime.strptime(b_str, F_TAM).isoformat()
-                            end = datetime.strptime(d_str, F_TAM).isoformat()
-                            all_day = False
-                        else: # Günlük İzin
-                            start = datetime.strptime(b_str, F_TARIH).strftime("%Y-%m-%d")
-                            end = datetime.strptime(d_str, F_TARIH).strftime("%Y-%m-%d")
-                            all_day = True
-                        
-                        # --- RENK MANTĞI BURADA ---
-                        tur = row['Tür']
-                        if "Yıllık" in tur:
-                            renk = "#FF4B4B"  # Kırmızı
-                        elif "Geç Kalma" in tur:
-                            renk = "#FFA500"  # Turuncu
-                        else:
-                            renk = "#3D9DF3"  # Mavi
-                        
-                        events.append({
-                            "title": f"{row[ad_c]} ({tur})",
-                            "start": start, "end": end, "allDay": all_day,
-                            "color": renk
-                        })
+                        all_day = len(b_str) <= 10
+                        start = datetime.strptime(b_str, F_TARIH if all_day else F_TAM).isoformat()
+                        end = datetime.strptime(d_str, F_TARIH if all_day else F_TAM).isoformat()
+                        renk = "#FF4B4B" if "Yıllık" in row['Tür'] else "#FFA500" if "Geç Kalma" in row['Tür'] else "#3D9DF3"
+                        events.append({"title": f"{row[ad_c]} ({row['Tür']})", "start": start, "end": end, "allDay": all_day, "color": renk})
                     except: continue
-            calendar(events=events, options={"headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek"}, "locale": "tr"})
+            calendar(events=events, options={"locale": "tr"})
 
-        with t[2]: # Karne
+        with t[2]: # Karne + PDF
             if not df_o.empty:
                 ay_list = sorted(df_o['Ay'].dropna().unique(), reverse=True)
                 if ay_list:
                     ay_sec = st.selectbox("Ay Seç", ay_list)
-                    st.dataframe(df_o[df_o['Ay']==ay_sec].groupby([ad_c,'Tür'])[['G','S']].sum(), use_container_width=True)
+                    k_df = df_o[df_o['Ay']==ay_sec].groupby([ad_c,'Tür'])[['G','S']].sum()
+                    st.dataframe(k_df, use_container_width=True)
+                    pdf = pdf_olustur(k_df, ay_sec)
+                    st.download_button("📥 PDF OLARAK İNDİR", data=pdf, file_name=f"Karne_{ay_sec}.pdf", mime="application/pdf")
 
         with t[3]: # Sicil
-            ps = st.selectbox("Personel Seç", p_listesi, key="sicil_p")
+            ps = st.selectbox("Personel", p_listesi)
             if not df_o.empty: st.dataframe(df_o[df_o[ad_c]==ps][['Başlangıç','Dönüş','Tür','G','S']], use_container_width=True)
 
         with t[4]: # Yıllık İzin
-            py = st.selectbox("Personel", p_listesi, key="adm_yillik")
+            py = st.selectbox("Personel Seç", p_listesi)
             gt = datetime.strptime(PERSONEL_GIRISLERI.get(py, "2024-01-01"), "%Y-%m-%d")
-            kidem = datetime.now().year - gt.year - ((datetime.now().month, datetime.now().day) < (gt.month, gt.day))
-            hk, ku = hakedis_bul(max(0, kidem)), (df_o[(df_o[ad_c]==py) & (df_o['Tür'].str.contains("Yıllık"))]['G'].sum() if not df_o.empty else 0)
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Toplam Hak", f"{hk} G"); c2.metric("Kullanılan", f"{ku} G"); c3.metric("Kalan", f"{hk-ku} G")
+            kidem = datetime.now().year - gt.year
+            hk, ku = hakedis_bul(kidem), (df_o[(df_o[ad_c]==py) & (df_o['Tür'].str.contains("Yıllık"))]['G'].sum() if not df_o.empty else 0)
+            st.metric("Kalan İzin", f"{hk-ku} Gün")
 
-        with t[5]: # Manuel Giriş
-            ma = st.selectbox("Personel Seç", p_listesi, key="m_ad")
-            mt = st.selectbox("İzin Türü", IZ, key="m_tur")
-            ms = st.radio("Süre Tipi", ["Tam Gün", "Saatlik"], horizontal=True, key="m_süre")
-            mt1 = st.date_input("Tarih Seç", key="m_t1")
-            m_bas, m_bit = "", ""
-            if ms == "Saatlik":
-                mc1, mc2 = st.columns(2)
-                ms1 = mc1.time_input("Başlangıç", value=datetime.strptime("09:00", "%H:%M").time(), key="ms1")
-                ms2 = mc2.time_input("Bitiş", value=datetime.strptime("10:00", "%H:%M").time(), key="ms2")
-                m_bas, m_bit = f"{mt1.strftime(F_TARIH)} {ms1.strftime(F_SAAT)}", f"{mt1.strftime(F_TARIH)} {ms2.strftime(F_SAAT)}"
-            else:
-                mt2 = st.date_input("Dönüş Tarihi", key="m_t2")
-                m_bas, m_bit = mt1.strftime(F_TARIH), mt2.strftime(F_TARIH)
-            
-            with st.form("m_form_sub"):
-                if st.form_submit_button("ONAYLI KAYDET"):
-                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ma,"tur":f"{mt} ({ms})","bas":m_bas,"bit":m_bit, "durum": "Onaylandı"}))
-                    st.session_state['wa_adm_man'] = f"✅ *SAYIN {ma},*\n🗓 *{m_bas} - {m_bit}*\n📋 *{mt}* kaydınız işlenmiştir."
-                    st.success("Kaydedildi.")
-            if 'wa_adm_man' in st.session_state:
-                st.link_button("🟢 BİLGİ MESAJI GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_adm_man'])}", use_container_width=True)
+        with t[5]: # Manuel
+            ma = st.selectbox("Personel", p_listesi, key="m_a")
+            mt = st.selectbox("Tür", IZ, key="m_t")
+            mt1 = st.date_input("Tarih", key="m_d1")
+            mt2 = st.date_input("Dönüş", key="m_d2")
+            if st.button("KAYDET"):
+                requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ma,"tur":f"{mt} (Tam Gün)","bas":mt1.strftime(F_TARIH),"bit":mt2.strftime(F_TARIH), "durum": "Onaylandı"}))
+                st.success("Eklendi.")
 
         with t[6]: # Geç Kalma
-            ga, gt, gd = st.selectbox("Personel", p_listesi, key="g_ad"), st.date_input("Tarih", key="g_t"), st.slider("Dakika", 1, 60, 15)
-            with st.form("g_form_sub"):
-                if st.form_submit_button("İŞLE"):
-                    requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ga,"tur":"Geç Kalma","bas":f"{gt.strftime(F_TARIH)} 09:00","bit":f"{gt.strftime(F_TARIH)} 09:{gd:02d}", "durum": "Onaylandı"}))
-                    st.session_state['wa_adm_gec'] = f"⏰ *BİLGİLENDİRME*\nSayın {ga}, *{gt.strftime(F_TARIH)}* tarihindeki *{gd} dakikalık* geç kalmanız sisteme işlenmiştir."
-                    st.success("İşlendi.")
-            if 'wa_adm_gec' in st.session_state:
-                st.link_button("🟢 GEÇ KALMA BİLGİSİ GÖNDER (WA)", f"https://api.whatsapp.com/send?text={urllib.parse.quote(st.session_state['wa_adm_gec'])}", use_container_width=True)
+            ga, gt, gd = st.selectbox("Personel", p_listesi, key="g_a"), st.date_input("Tarih", key="g_d"), st.slider("Dakika", 1, 60, 15)
+            if st.button("İŞLE"):
+                requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ga,"tur":"Geç Kalma","bas":f"{gt.strftime(F_TARIH)} 09:00","bit":f"{gt.strftime(F_TARIH)} 09:{gd:02d}", "durum": "Onaylandı"}))
+                st.success("İşlendi.")
 
-        with t[7]: # Sil
+        with t[7]: # Liste/Sil
             if not df_all.empty:
                 df_l = df_all.copy(); df_l.insert(0, "ID", df_l.index + 2); st.dataframe(df_l, use_container_width=True)
-                sid = st.number_input("Sil ID:", min_value=2, step=1, key="adm_sil")
-                if st.button("❌ KAYDI SİL"):
+                sid = st.number_input("Silinecek ID:", min_value=2)
+                if st.button("SİL"):
                     requests.post(URL, data=json.dumps({"islem": "sil", "satir": int(sid)}))
                     st.error("Silindi.")
-
