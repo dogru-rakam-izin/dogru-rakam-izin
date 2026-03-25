@@ -150,19 +150,60 @@ else:
                     st.success("Onaylandı!")
             else: st.info("Bekleyen yok.")
 
-        with t[1]: # Takvim
+       with t[1]: # 📅 TAKVİM GÖRÜNÜMÜ
+            st.subheader("İzin Takvimi")
             events = []
             if not df_o.empty:
                 for _, row in df_o.iterrows():
                     try:
-                        b_str, d_str = str(row['Başlangıç']), str(row['Dönüş'])
-                        all_day = len(b_str) <= 10
-                        start = datetime.strptime(b_str, F_TARIH if all_day else F_TAM).isoformat()
-                        end = datetime.strptime(d_str, F_TARIH if all_day else F_TAM).isoformat()
-                        renk = "#FF4B4B" if "Yıllık" in row['Tür'] else "#FFA500" if "Geç Kalma" in row['Tür'] else "#3D9DF3"
-                        events.append({"title": f"{row[ad_c]} ({row['Tür']})", "start": start, "end": end, "allDay": all_day, "color": renk})
-                    except: continue
-            calendar(events=events, options={"locale": "tr"})
+                        # Tarih verilerini string'e çevir ve temizle
+                        b_str = str(row['Başlangıç']).strip()
+                        d_str = str(row['Dönüş']).strip()
+                        
+                        # Saatlik mi yoksa Tam Gün mü kontrolü (Karakter sayısına göre)
+                        if len(b_str) > 10: 
+                            # Saatlik/Geç Kalma Formatı: 25/03/2026 09:00
+                            start_dt = datetime.strptime(b_str, F_TAM)
+                            end_dt = datetime.strptime(d_str, F_TAM)
+                            all_day = False
+                        else:
+                            # Tam Gün Formatı: 25/03/2026
+                            start_dt = datetime.strptime(b_str, F_TARIH)
+                            end_dt = datetime.strptime(d_str, F_TARIH)
+                            all_day = True
+                        
+                        # Renk Belirleme
+                        tur = str(row['Tür'])
+                        if "Yıllık" in tur:
+                            renk = "#FF4B4B" # Kırmızı
+                        elif "Geç Kalma" in tur:
+                            renk = "#FFA500" # Turuncu
+                        else:
+                            renk = "#3D9DF3" # Mavi
+                        
+                        # Takvim etkinliğini listeye ekle
+                        events.append({
+                            "title": f"{row[ad_c]} ({tur})",
+                            "start": start_dt.isoformat(),
+                            "end": end_dt.isoformat(),
+                            "allDay": all_day,
+                            "color": renk
+                        })
+                    except Exception as e:
+                        continue # Hatalı satırı atla
+            
+            # Takvimi görüntüle
+            calendar_options = {
+                "headerToolbar": {
+                    "left": "prev,next today",
+                    "center": "title",
+                    "right": "dayGridMonth,timeGridWeek,listWeek",
+                },
+                "initialView": "dayGridMonth",
+                "locale": "tr",
+            }
+            
+            calendar(events=events, options=calendar_options, key="izin_takvimi")
 
         with t[2]: # Karne
             if not df_o.empty:
