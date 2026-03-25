@@ -141,17 +141,26 @@ else:
                     st.success("Onaylandı!"); st.rerun()
             else: st.info("Onay bekleyen kayıt yok.")
 
-        with t[1]: # TAKVİM
-            st.subheader("Onaylanmış İzin Takvimi")
-            evs = []
+        with t[1]: # TAKVİM (HATA GİDERİLDİ)
+            st.subheader("İzin Takvimi")
+            events = []
             if not df_o.empty:
                 for _, r in df_o.iterrows():
                     try:
-                        b_s, d_s = str(r['Başlangıç']).strip(), str(r['Dönüş']).strip()
-                        is_all = len(b_s) <= 10
-                        evs.append({"title": f"{r[ad_c]} ({r['Tür']})", "start": datetime.strptime(b_s, F_TARIH if is_all else F_TAM).isoformat(), "end": datetime.strptime(d_s, F_TARIH if is_all else F_TAM).isoformat(), "allDay": is_all, "color": "#FF4B4B" if "Yıllık" in str(r['Tür']) else "#FFA500" if "Geç Kalma" in str(r['Tür']) else "#3D9DF3"})
+                        b_str, d_str = str(r['Başlangıç']).strip(), str(r['Dönüş']).strip()
+                        is_all_day = len(b_str) <= 10
+                        fmt = F_TARIH if is_all_day else F_TAM
+                        events.append({
+                            "title": f"{r[ad_c]} ({r['Tür']})",
+                            "start": datetime.strptime(b_str, fmt).isoformat(),
+                            "end": datetime.strptime(d_str, fmt).isoformat(),
+                            "allDay": is_all_day,
+                            "backgroundColor": "#FF4B4B" if "Yıllık" in str(r['Tür']) else "#3D9DF3"
+                        })
                     except: continue
-            calendar(events=evs, options={"locale":"tr", "headerToolbar":{"left":"prev,next today","center":"title","right":"dayGridMonth,timeGridWeek"}}, key="takvim_vFinal_2026")
+            
+            # Takvimi her zaman basması için key'i sabitledik
+            calendar(events=events, options={"locale":"tr", "initialView":"dayGridMonth", "headerToolbar":{"left":"prev,next today","center":"title","right":"dayGridMonth,timeGridWeek"}}, key="cal_fixed_2026")
 
         with t[2]: # KARNE
             if not df_o.empty:
@@ -180,7 +189,7 @@ else:
             ku = df_o[(df_o[ad_c]==py) & (df_o['Tür'].str.contains("Yıllık"))]['G'].sum() if not df_o.empty else 0
             st.metric("Kalan Yıllık İzin", f"{hk-ku} Gün")
 
-        with t[5]: # MANUEL GİRİŞ + WHATSAPP
+        with t[5]: # MANUEL GİRİŞ
             ma = st.selectbox("Personel", p_listesi, key="m_a")
             mt = st.selectbox("Tür", IZIN_TURLERI, key="m_t")
             m_tip = st.radio("Tip", ["Tam Gün", "Saatlik"], horizontal=True, key="m_tip")
@@ -196,12 +205,11 @@ else:
                 mt2 = st.date_input("İş Başı Tarihi", key="m_d2")
                 m_bas, m_bit = mt1.strftime(F_TARIH), mt2.strftime(F_TARIH)
                 
-            if st.button("MANUEL KAYDET (ONAYLI)"):
+            if st.button("MANUEL KAYDET"):
                 requests.post(URL, data=json.dumps({"tarih":datetime.now().strftime(F_TARIH),"ad":ma,"tur":f"{mt} ({m_tip})","bas":m_bas,"bit":m_bit, "durum": "Onaylandı"}))
-                st.success("Kayıt veritabanına eklendi.")
+                st.success("Kayıt eklendi.")
             
-            # Manuel Giriş için de WhatsApp Bildirimi
-            m_msg = f"*MANUEL İZİN KAYDI*\n👤 *Personel:* {ma}\n📝 *Tür:* {mt}\n📅 *Başlangıç:* {m_bas}\n🔙 *Dönüş:* {m_bit}"
+            m_msg = f"*MANUEL KAYIT*\n👤 *Personel:* {ma}\n📝 *Tür:* {mt}\n📅 *Başlangıç:* {m_bas}\n🔙 *Dönüş:* {m_bit}"
             st.markdown(f'<a href="https://wa.me/?text={urllib.parse.quote(m_msg)}" target="_blank" style="text-decoration:none;"><div style="background-color:#25D366;color:white;padding:10px;text-align:center;border-radius:5px;font-weight:bold;">📢 WHATSAPP İLE BİLDİR</div></a>', unsafe_allow_html=True)
 
         with t[6]: # GEÇ KALMA
