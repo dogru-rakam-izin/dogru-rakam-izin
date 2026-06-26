@@ -2,13 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import json
-from datetime import datetime, timedelta
-from io import BytesIO
-from streamlit_calendar import calendar
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
+from datetime import datetime
 import urllib.parse
 
 # --- 1. YARDIMCI FONKSİYONLAR ---
@@ -25,31 +19,6 @@ def sure_formatla(deger, tip="G"):
         if saat > 0: sonuc += f"{saat} Saat "
         if dakika > 0: sonuc += f"{dakika} Dakika"
         return sonuc.strip() if sonuc else "0 Dakika"
-
-def pdf_olustur(df, secili_ay, ad_c):
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
-    elements = []
-    def tr(metin): 
-        return str(metin).replace('İ', 'I').replace('ı', 'i').replace('Ş', 'S').replace('ş', 's')\
-                         .replace('Ğ', 'G').replace('ğ', 'g').replace('Ü', 'U').replace('ü', 'u')\
-                         .replace('Ö', 'O').replace('ö', 'o').replace('Ç', 'C').replace('ç', 'c')
-    
-    styles = getSampleStyleSheet()
-    elements.append(Paragraph(f"<b>{tr(secili_ay)} - Personel Izin Karnesi</b>", styles['Title']))
-    data = [["Ad Soyad", "Izin Turu", "Gun", "Saat/Dakika"]]
-    for idx, row in df.iterrows():
-        data.append([tr(row[ad_c]), tr(row['Tür']), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
-    table = Table(data, colWidths=[160, 140, 80, 100])
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.darkred), 
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke), 
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'), 
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.black)
-    ]))
-    elements.append(table)
-    doc.build(elements)
-    return buffer.getvalue()
 
 # --- 2. AYARLAR ---
 URL = "https://google.com"
@@ -77,18 +46,22 @@ PERSONEL_GIRISLERI = {
 def yukle():
     try:
         df = pd.read_csv(CSV)
-        if df.empty: return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
+        if df.empty: return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         df.columns = [str(c).strip() for c in df.columns]
-        ad_col = next((c for c in df.columns if "AD" in c.upper()), "Ad Soyad")
-        durum_col = next((c for c in df.columns if "DURUM" in c.upper()), "Durum")
-        df[durum_col] = df.get(durum_col, "Onay Bekliyor").fillna("Onay Bekliyor").astype(str).str.strip()
-        df[ad_col] = df[ad_col].astype(str).str.strip().str.upper()
+        
+        # Google Sheets sütun isimlerinden bağımsız ilk 5 sütunu sırayla eşitle
+        df = df.iloc[:, :5]
+        df.columns = ["Zaman Damgası", "Ad Soyad", "Tür", "Başlangıç", "Dönüş"]
+        
+        # Ekstra Durum sütunu kontrolü
+        df["Durum"] = "Onaylandı" if "Durum" not in df.columns else df["Durum"].fillna("Onay Bekliyor")
+        df["Ad Soyad"] = df["Ad Soyad"].astype(str).str.strip().str.upper()
         
         def h(r):
             try:
-                ts = str(r['Tür']).upper().replace('İ', 'I').replace('Ş', 'S').replace('Ğ', 'G').replace('Ç', 'C').replace('Ü', 'U').replace('Ö', 'O')
+                ts = str(r['Tür']).upper()
                 b_s, d_s = str(r['Başlangıç']).strip(), str(r['Dönüş']).strip()
-                if "SAATLIK" in ts or "GEC KALMA" in ts or "SAATLİK" in ts or "GEÇ KALMA" in ts:
+                if "SAATLIK" in ts or "GEC" in ts or "SAATLİK" in ts or "GEÇ" in ts:
                     b, d = datetime.strptime(b_s, F_TAM), datetime.strptime(d_s, F_TAM)
                     return pd.Series([0.0, round((d-b).total_seconds()/3600, 2)])
                 else:
@@ -97,17 +70,17 @@ def yukle():
             except: 
                 return pd.Series([0.0, 0.0])
             
-        df_b = df[df[durum_col].str.contains("Bekliyor", case=False, na=True)].copy()
-        df_o = df[df[durum_col].str.contains("Onaylandı", case=False, na=False)].copy()
+        df_b = df[df["Durum"].str.contains("Bekliyor", case=False, na=True)].copy()
+        df_o = df[df["Durum"].str.contains("Onaylandı", case=False, na=False)].copy()
         if not df_o.empty:
             df_o[['G', 'S']] = df_o.apply(h, axis=1)
             df_o['T'] = pd.to_datetime(df_o['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
             df_o['Ay'] = df_o['T'].dt.strftime('%B').map(TR_AYLAR) + " " + df_o['T'].dt.strftime('%Y')
-        return df, df_b, df_o, ad_col
+        return df, df_b, df_o
     except: 
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-df_all, df_b, df_o, ad_c = yukle()
+df_all, df_b, df_o = yukle()
 p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
 
 st.markdown(f"<div style='text-align: center;'><img src='{LOGO_URL}' width='350'></div>", unsafe_allow_html=True)
@@ -141,15 +114,15 @@ if menu == "👤 PERSONEL GİRİŞİ":
 else:
     sifre = st.sidebar.text_input("Şifre", type="password")
     if sifre == "2020":
-        tab_onay, tab_takvim, tab_karne, tab_sicil, tab_yillik, tab_manuel, tab_gecikme, tab_liste = st.tabs(
-            ["🔔 Onay", "📅 Takvim", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel", "⏰ Geç Kalma", "🗑️ Liste"]
+        tab_onay, tab_izinler, tab_karne, tab_sicil, tab_yillik, tab_manuel, tab_gecikme, tab_liste = st.tabs(
+            ["🔔 Onay", "📅 Onaylı İzinler", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel", "⏰ Geç Kalma", "🗑️ Liste"]
         )
         
         with tab_onay:
             if not df_b.empty:
                 df_b_g = df_b.copy()
                 df_b_g.insert(0, "ID", df_b_g.index + 2)
-                st.table(df_b_g[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
+                st.table(df_b_g[["ID", "Ad Soyad", "Tür", "Başlangıç", "Dönüş"]])
                 o_id = st.number_input("Onay ID:", min_value=2, step=1)
                 if st.button("✅ ONAYLA"):
                     requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(o_id)}))
@@ -158,27 +131,59 @@ else:
             else: 
                 st.info("Onay bekleyen kayıt yok.")
 
-        with tab_takvim:
+        with tab_izinler:
+            st.markdown("### 📅 Onaylanmış Tüm Güncel İzinler")
             if not df_o.empty:
-                events = []
-                for _, row in df_o.iterrows():
-                    try:
-                        ts = str(row['Tür'])
-                        if any(x in ts for x in ["Saatlik", "Geç Kalma"]):
-                            start_dt = datetime.strptime(row['Başlangıç'].strip(), F_TAM)
-                            end_dt = datetime.strptime(row['Dönüş'].strip(), F_TAM)
-                        else:
-                            start_dt = datetime.strptime(row['Başlangıç'].strip()[:10], F_TARIH)
-                            end_dt = datetime.strptime(row['Dönüş'].strip()[:10], F_TARIH) + timedelta(days=1)
-                        
-                        events.append({
-                            "title": f"{row[ad_c]} ({row['Tür']})",
-                            "start": start_dt.isoformat(),
-                            "end": end_dt.isoformat(),
-                            "allDay": not any(x in ts for x in ["Saatlik", "Geç Kalma"])
-                        })
-                    except:
-                        continue
-                
-                calendar_options = {
-                    "headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek,timeGridDay"},
+                st.dataframe(df_o[["Ad Soyad", "Tür", "Başlangıç", "Dönüş"]], use_container_width=True)
+            else:
+                st.info("Henüz onaylanmış bir izin bulunmuyor.")
+
+        with tab_karne:
+            if not df_o.empty and 'Ay' in df_o.columns:
+                aylar = df_o['Ay'].dropna().unique()
+                if len(aylar) > 0:
+                    secili_ay = st.selectbox("Ay Seçiniz", aylar)
+                    df_ay = df_o[df_o['Ay'] == secili_ay]
+                    
+                    karne_df = df_ay.groupby(["Ad Soyad", 'Tür']).agg({'G': 'sum', 'S': 'sum'}).reset_index()
+                    karne_df['Gün Format'] = karne_df['G'].apply(lambda x: sure_formatla(x, "G"))
+                    karne_df['Saat Format'] = karne_df['S'].apply(lambda x: sure_formatla(x, "S"))
+                    
+                    st.dataframe(karne_df[["Ad Soyad", 'Tür', 'Gün Format', 'Saat Format']], use_container_width=True)
+                else:
+                    st.info("Aylara göre gruplanacak veri bulunamadı.")
+            else:
+                st.info("Karne oluşturulabilecek onaylanmış veri bulunamadı.")
+
+        with tab_sicil:
+            secili_p = st.selectbox("Personel Seçiniz", p_listesi, key="sicil_p")
+            if not df_o.empty:
+                df_p_o = df_o[df_o["Ad Soyad"] == secili_p]
+                if not df_p_o.empty:
+                    st.markdown(f"### {secili_p} - Geçmiş İzinleri")
+                    st.dataframe(df_p_o[["Tür", "Başlangıç", "Dönüş"]], use_container_width=True)
+                else:
+                    st.info("Bu personele ait onaylanmış izin bulunmuyor.")
+            else:
+                st.info("Veri tabanında onaylı izin yok.")
+
+        with tab_yillik:
+            st.markdown("### 📅 Personel Yıllık İzin Durumları")
+            hakedis_liste = []
+            bugun = datetime.now()
+            
+            for p, g_tarih_str in PERSONEL_GIRISLERI.items():
+                try:
+                    g_tarih = datetime.strptime(g_tarih_str, "%Y-%m-%d")
+                    calisilan_yil = (bugun - g_tarih).days // 365
+                    
+                    if calisilan_yil < 1: toplam_hak = 0
+                    elif 1 <= calisilan_yil < 6: toplam_hak = calisilan_yil * 14
+                    elif 6 <= calisilan_yil < 15: toplam_hak = calisilan_yil * 20
+                    else: toplam_hak = calisilan_yil * 26
+                    
+                    kullanilan = 0.0
+                    if not df_o.empty:
+                        df_p_yillik = df_o[(df_o["Ad Soyad"] == p) & (df_o['Tür'].str.contains("Yıllık", case=False, na=False))]
+                        kullanilan = df_p_yillik['G'].sum()
+                    
