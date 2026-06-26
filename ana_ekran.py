@@ -26,7 +26,7 @@ def sure_formatla(deger, tip="G"):
         if dakika > 0: sonuc += f"{dakika} Dakika"
         return sonuc.strip() if sonuc else "0 Dakika"
 
-def pdf_olustur(df, secili_ay):
+def pdf_olustur(df, secili_ay, ad_c):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     elements = []
@@ -39,7 +39,7 @@ def pdf_olustur(df, secili_ay):
     elements.append(Paragraph(f"<b>{tr(secili_ay)} - Personel Izin Karnesi</b>", styles['Title']))
     data = [["Ad Soyad", "Izin Turu", "Gun", "Saat/Dakika"]]
     for idx, row in df.iterrows():
-        data.append([tr(row[df.columns[0]]), tr(row['Tür']), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
+        data.append([tr(row[ad_c]), tr(row['Tür']), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
     table = Table(data, colWidths=[160, 140, 80, 100])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.darkred), 
@@ -139,9 +139,12 @@ if menu == "👤 PERSONEL GİRİŞİ":
 else:
     sifre = st.sidebar.text_input("Şifre", type="password")
     if sifre == "2020":
-        t = st.tabs(["🔔 Onay", "📅 Takvim", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel", "⏰ Geç Kalma", "🗑️ Liste"])
+        # Uniq sekmeler atanarak Python'un blok şaşırması engellendi
+        tab_onay, tab_takvim, tab_karne, tab_sicil, tab_yillik, tab_manuel, tab_gecikme, tab_liste = st.tabs(
+            ["🔔 Onay", "📅 Takvim", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel", "⏰ Geç Kalma", "🗑️ Liste"]
+        )
         
-        with t[0]: # ONAY
+        with tab_onay:
             if not df_b.empty:
                 df_b_g = df_b.copy()
                 df_b_g.insert(0, "ID", df_b_g.index + 2)
@@ -154,7 +157,7 @@ else:
             else: 
                 st.info("Onay bekleyen kayıt yok.")
 
-        with t[1]: # TAKVİM
+        with tab_takvim:
             if not df_o.empty:
                 events = []
                 for _, row in df_o.iterrows():
@@ -181,8 +184,3 @@ else:
                     "initialView": "dayGridMonth",
                     "locale": "tr"
                 }
-                calendar(events=events, options=calendar_options)
-            else:
-                st.info("Takvimde gösterilecek onaylı izin bulunmuyor.")
-
-        with t[2]: # KARNE
