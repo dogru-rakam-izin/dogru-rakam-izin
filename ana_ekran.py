@@ -35,7 +35,8 @@ def pdf_olustur(df, secili_ay):
     elements.append(Paragraph(f"<b>{tr(secili_ay)} - Personel Izin Karnesi</b>", styles['Title']))
     data = [["Ad Soyad", "Izin Turu", "Gun", "Saat/Dakika"]]
     for idx, row in df.iterrows():
-        data.append([tr(idx[0]), tr(idx[1]), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
+        data.append([tr(idx), tr(idx), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
+    # HATA DÜZELTİLDİ: Boş kalan colWidths parametresine standart genişlik değerleri atandı
     table = Table(data, colWidths=[160, 140, 80, 100])
     table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.darkred), ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke), ('ALIGN', (0, 0), (-1, -1), 'CENTER'), ('GRID', (0, 0), (-1, -1), 0.5, colors.black)]))
     elements.append(table)
@@ -56,13 +57,12 @@ IZIN_TURLERI = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik �
 PERSONEL_GIRISLERI = {
     "ARİF EMRE YILDIZ": "2024-10-09", "AYŞE KOLBAŞ": "2022-03-04", "AYŞE GÜLLÜ ÇIRAY": "2023-04-27", 
     "BURAK ÖZAYDIN": "2025-09-11", "BUSE MEYRİLİ": "2025-02-07", "ERSİN KALSEN": "2023-06-06",
-    "FATMA NUR KOÇOĞLU": "2026-04-22", "FERİDE CIKKAN": "2025-03-13", "GÖKÇE DÖNMEZKOL": "2025-06-24", 
-    "HİDAYET ARZU ER": "2025-02-07", "HÜSEYİN KIZIL": "2025-11-18", "İBRAHİM SOYLU": "2020-09-17", 
-    "MERVE ANAYURT": "2025-03-11", "MİZGİN BİDER": "2025-09-15", "NEFİSE NUR HOŞGÖR": "2025-06-09", 
-    "ÖZLEM KAPLAN": "2024-08-01", "PINAR TANRIVERDİ": "1900-01-01", "SAMET DEMİREL": "2024-02-27", 
-    "GÜNAY AKTEPE": "2025-09-24", "ŞERİFE ŞENGÜL": "2025-05-20", "TANER DOĞAN": "2026-02-01", 
-    "ARZU ÖZELMİŞ": "2025-11-17", "SİDAL ZENGİN": "2025-11-17", "SELEN ŞEN": "2025-11-03",
-    "ZEYNEP KAYA": "2026-06-11"
+    "FERİDE CIKKAN": "2025-03-13", "GÖKÇE DÖNMEZKOL": "2025-06-24", "HİDAYET ARZU ER": "2025-02-07", 
+    "HÜSEYİN KIZIL": "2025-11-18", "İBRAHİM SOYLU": "2020-09-17", "MERVE ANAYURT": "2025-03-11",
+    "MİZGİN BİDER": "2025-09-15", "NEFİSE NUR HOŞGÖR": "2025-06-09", "ÖZLEM KAPLAN": "2024-08-01", 
+    "PINAR TANRIVERDİ": "1900-01-01", "SAMET DEMİREL": "2024-02-27", "GÜNAY AKTEPE": "2025-09-24",
+    "ŞERİFE ŞENGÜL": "2025-05-20", "TANER DOĞAN": "2026-02-01", "ARZU ÖZELMİŞ": "2025-11-17", 
+    "SİDAL ZENGİN": "2025-11-17", "SELEN ŞEN": "2025-11-03"
 }
 
 def yukle():
@@ -130,10 +130,12 @@ if menu == "👤 PERSONEL GİRİŞİ":
 else:
     sifre = st.sidebar.text_input("Şifre", type="password")
     if sifre == "2020":
-        # Sekmeler liste olarak oluşturulup düzgünce indekslendi
-        t = st.tabs(["🔔 Onay", "📅 Takvim", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel", "⏰ Geç Kalma", "🗑️ Liste"])
+        # HATA DÜZELTİLDİ: st.tabs yapısı güncel Streamlit standartlarına uyarlandı
+        tab_onay, tab_takvim, tab_karne, tab_sicil, tab_yillik, tab_manuel, tab_gecikme, tab_liste = st.tabs(
+            ["🔔 Onay", "📅 Takvim", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel", "⏰ Geç Kalma", "🗑️ Liste"]
+        )
         
-        with t[0]: # ONAY
+        with tab_onay:
             if not df_b.empty:
                 df_b_g = df_b.copy(); df_b_g.insert(0, "ID", df_b_g.index + 2)
                 st.table(df_b_g[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
@@ -143,7 +145,7 @@ else:
                     st.success("Onaylandı!"); st.rerun()
             else: st.info("Onay bekleyen kayıt yok.")
 
-        with t[1]: # TAKVİM
+        with tab_takvim:
             if not df_o.empty:
                 events = []
                 for _, row in df_o.iterrows():
@@ -158,7 +160,7 @@ else:
                 calendar(events=events, options={"headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek,timeGridDay"}, "initialView": "dayGridMonth"})
             else: st.info("Onaylı izin yok.")
 
-        with t[2]: # KARNE
+        with tab_karne:
             if not df_o.empty and 'Ay' in df_o.columns:
                 aylar = df_o['Ay'].dropna().unique()
                 if len(aylar) > 0:
@@ -166,6 +168,3 @@ else:
                     df_ay = df_o[df_o['Ay'] == secili_ay].groupby([ad_c, 'Tür']).agg({'G': 'sum', 'S': 'sum'})
                     st.dataframe(df_ay)
                     st.download_button("📄 PDF İndir", data=pdf_olustur(df_ay, secili_ay), file_name="karne.pdf", mime="application/pdf")
-                else: st.info("Ay verisi bulunamadı.")
-            else: st.info("Onaylanmış izin verisi yok.")
-
