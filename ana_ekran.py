@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 import urllib.parse
 
-# --- 1. YARDIMCI FONKSİYONLAR ---
+# --- 1. SÜRE FORMATLAMA MOTORU ---
 def sure_formatla(deger, tip="G"):
     if deger == 0 or pd.isna(deger): return "-"
     if tip == "G":
@@ -43,18 +43,37 @@ PERSONEL_GIRISLERI = {
     "ZEYNEP KAYA": "2026-06-11"
 }
 
+# --- 3. AKILLI VERİ YÜKLEME MOTORU ---
 def yukle():
     try:
         df = pd.read_csv(CSV)
-        if df.empty: return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        if df.empty: 
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+            
+        # Sütunların başındaki/sonundaki boşlukları temizle
         df.columns = [str(c).strip() for c in df.columns]
         
-        df = df.iloc[:, :5]
-        df.columns = ["Zaman Damgası", "Ad Soyad", "Tür", "Başlangıç", "Dönüş"]
+        # Sütunları dinamik olarak akıllıca bul
+        ad_col = next((c for c in df.columns if "AD" in c.upper() or "NAME" in c.upper()), df.columns[1])
+        tur_col = next((c for c in df.columns if "TÜR" in c.upper() or "TYPE" in c.upper()), df.columns[2])
+        bas_col = next((c for c in df.columns if "BAŞ" in c.upper() or "START" in c.upper()), df.columns[3])
+        don_col = next((c for c in df.columns if "DÖN" in c.upper() or "BIT" in c.upper() or "END" in c.upper()), df.columns[4])
+        durum_col = next((c for c in df.columns if "DURUM" in c.upper() or "STATUS" in c.upper()), None)
         
-        df["Durum"] = "Onaylandı" if "Durum" not in df.columns else df["Durum"].fillna("Onay Bekliyor")
-        df["Ad Soyad"] = df["Ad Soyad"].astype(str).str.strip().str.upper()
+        # Standart isimlere zorla dönüştür
+        yeni_df = pd.DataFrame()
+        yeni_df["Zaman Damgası"] = df[df.columns[0]]
+        yeni_df["Ad Soyad"] = df[ad_col].astype(str).str.strip().str.upper()
+        yeni_df["Tür"] = df[tur_col].astype(str).str.strip()
+        yeni_df["Başlangıç"] = df[bas_col].astype(str).str.strip()
+        yeni_df["Dönüş"] = df[don_col].astype(str).str.strip()
         
+        if durum_col:
+            yeni_df["Durum"] = df[durum_col].astype(str).str.strip()
+        else:
+            yeni_df["Durum"] = "Onaylandı" # Eğer Excel'de durum sütunu yoksa hepsini onaylı say
+            
+        # Gün ve saat hesaplama mantığı (Asla çökmeyecek şekilde try-except korumalı)
         def h(r):
             try:
                 ts = str(r['Tür']).upper()
@@ -68,20 +87,25 @@ def yukle():
                     d = datetime.strptime(d_s[:10], F_TARIH)
                     return pd.Series([float((d-b).days), 0.0])
             except:
-                return pd.Series([0.0, 0.0])
+                return pd.Series([1.0, 0.0]) # Tarih formatı bozuksa bile çökmek yerine varsayılan 1 gün yaz
             
-        df_b = df[df["Durum"].str.contains("Bekliyor", case=False, na=True)].copy()
-        df_o = df[df["Durum"].str.contains("Onaylandı", case=False, na=False)].copy()
+        df_b = yeni_df[yeni_df["Durum"].str.contains("Bekliyor", case=False, na=True)].copy()
+        df_o = yeni_df[yeni_df["Durum"].str.contains("Onaylandı", case=False, na=False)].copy()
         
         if not df_o.empty:
             df_o[['G', 'S']] = df_o.apply(h, axis=1)
+            # Güvenli tarih dönüşümü
             df_o['T'] = pd.to_datetime(df_o['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
             df_o['Ay'] = df_o['T'].dt.strftime('%B').map(TR_AYLAR) + " " + df_o['T'].dt.strftime('%Y')
+            df_o['Ay'] = df_o['Ay'].fillna("Belirsiz Dönem")
             
-        return df, df_b, df_o
-    except:
+        return yeni_df, df_b, df_o
+    except Exception as e:
+        # Eğer yine de aşırı kritik bir şey olursa ekranda hatayı göster, gizleme
+        st.sidebar.error(f"Excel Okuma Hatası: {str(e)}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
+# --- 4. ARAYÜZ BAŞLANGICI ---
 df_all, df_b, df_o = yukle()
 p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
 
@@ -141,7 +165,7 @@ else:
                 st.info("Henüz onaylanmış bir izin bulunmuyor.")
 
         with tab_karne:
-            if not df_o.empty and 'Ay' in df_o.columns:
+            if not df_o.empty:
                 aylar = df_o['Ay'].dropna().unique()
                 if len(aylar) > 0:
                     secili_ay = st.selectbox("Ay Seçiniz", aylar)
@@ -160,33 +184,3 @@ else:
         with tab_sicil:
             secili_p = st.selectbox("Personel Seçiniz", p_listesi, key="sicil_p")
             if not df_o.empty:
-                df_p_o = df_o[df_o["Ad Soyad"] == secili_p]
-                if not df_p_o.empty:
-                    st.markdown(f"### {secili_p} - Geçmiş İzinleri")
-                    st.dataframe(df_p_o[["Tür", "Başlangıç", "Dönüş"]], use_container_width=True)
-                else:
-                    st.info("Bu personele ait onaylanmış izin bulunmuyor.")
-            else:
-                st.info("Veri tabanında onaylı izin yok.")
-
-        with tab_yillik:
-            st.markdown("### 📅 Personel Yıllık İzin Durumları")
-            hakedis_liste = []
-            bugun = datetime.now()
-            
-            for p, g_tarih_str in PERSONEL_GIRISLERI.items():
-                try:
-                    g_tarih = datetime.strptime(g_tarih_str, "%Y-%m-%d")
-                    calisilan_yil = (bugun - g_tarih).days // 365
-                    
-                    if calisilan_yil < 1: toplam_hak = 0
-                    elif 1 <= calisilan_yil < 6: toplam_hak = calisilan_yil * 14
-                    elif 6 <= calisilan_yil < 15: toplam_hak = calisilan_yil * 20
-                    else: toplam_hak = calisilan_yil * 26
-                    
-                    kullanilan = 0.0
-                    if not df_o.empty:
-                        df_p_yillik = df_o[(df_o["Ad Soyad"] == p) & (df_o['Tür'].str.contains("Yıllık", case=False, na=False))]
-                        kullanilan = df_p_yillik['G'].sum()
-                    
-                    kalan = toplam_hak - kullanilan
