@@ -1,9 +1,14 @@
-
 import streamlit as st
 import pandas as pd
 import requests
 import json
 from datetime import datetime
+from io import BytesIO
+from streamlit_calendar import calendar
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
 import urllib.parse
 
 # --- 1. YARDIMCI FONKSİYONLAR ---
@@ -21,6 +26,22 @@ def sure_formatla(deger, tip="G"):
         if dakika > 0: sonuc += f"{dakika} Dakika"
         return sonuc.strip() if sonuc else "0 Dakika"
 
+def pdf_olustur(df, secili_ay):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    elements = []
+    def tr(metin): return str(metin).replace('İ', 'I').replace('ı', 'i').replace('Ş', 'S').replace('ş', 's').replace('Ğ', 'G').replace('ğ', 'g').replace('Ü', 'U').replace('ü', 'u').replace('Ö', 'O').replace('ö', 'o').replace('Ç', 'C').replace('ç', 'c')
+    styles = getSampleStyleSheet()
+    elements.append(Paragraph(f"<b>{tr(secili_ay)} - Personel Izin Karnesi</b>", styles['Title']))
+    data = [["Ad Soyad", "Izin Turu", "Gun", "Saat/Dakika"]]
+    for idx, row in df.iterrows():
+        data.append([tr(idx), tr(idx), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
+    table = Table(data, colWidths=[160, 140, 80, 100])
+    table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.darkred), ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke), ('ALIGN', (0, 0), (-1, -1), 'CENTER'), ('GRID', (0, 0), (-1, -1), 0.5, colors.black)]))
+    elements.append(table)
+    doc.build(elements)
+    return buffer.getvalue()
+
 # --- 2. AYARLAR ---
 URL = "https://google.com"
 S_ID = "1Ic8IMlsCZrCyUiTw6_aECivCa98Z32iNsHomq52g3CA"
@@ -32,7 +53,7 @@ F_TARIH, F_SAAT, F_TAM = '%d/%m/%Y', '%H:%M', '%d/%m/%Y %H:%M'
 TR_AYLAR = {"January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan","May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos","September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"}
 IZIN_TURLERI = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik İzin", "Ücretsiz İzin", "Evlilik İzni", "Vefat İzni", "Babalık İzni", "Eğitim", "Geç Kalma"]
 
-# İstediğiniz iki yeni isim doğrudan listeye güvenle eklenmiştir
+# İki yeni personel buraya eklenmiştir
 PERSONEL_GIRISLERI = {
     "ARİF EMRE YILDIZ": "2024-10-09", "AYŞE KOLBAŞ": "2022-03-04", "AYŞE GÜLLÜ ÇIRAY": "2023-04-27", 
     "BURAK ÖZAYDIN": "2025-09-11", "BUSE MEYRİLİ": "2025-02-07", "ERSİN KALSEN": "2023-06-06",
@@ -110,9 +131,10 @@ if menu == "👤 PERSONEL GİRİŞİ":
 else:
     sifre = st.sidebar.text_input("Şifre", type="password")
     if sifre == "2020":
-        tab_onay, tab_izinler, tab_karne, tab_sicil, tab_liste = st.tabs(["🔔 Onay", "📅 Onaylı İzinler", "📊 Karne", "📄 Sicil", "🗑️ Liste"])
+        # 8 Başlığın tamamı eksiksiz açılıyor
+        sekmeler = st.tabs(["🔔 Onay", "📅 Takvim", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel", "⏰ Geç Kalma", "🗑️ Liste"])
         
-        with tab_onay:
+        with sekmeler[0]: # ONAY
             if not df_b.empty:
                 df_b_g = df_b.copy(); df_b_g.insert(0, "ID", df_b_g.index + 2)
                 st.table(df_b_g[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
@@ -122,31 +144,27 @@ else:
                     st.success("Onaylandı!"); st.rerun()
             else: st.info("Onay bekleyen kayıt yok.")
 
-        with tab_izinler:
-            st.markdown("### 📅 Onaylanmış Güncel İzinler")
+        with sekmeler[1]: # TAKVİM
             if not df_o.empty:
-                st.dataframe(df_o[[ad_c, "Tür", "Başlangıç", "Dönüş"]], use_container_width=True)
+                events = []
+                for _, row in df_o.iterrows():
+                    try:
+                        ts = str(row['Tür'])
+                        if any(x in ts for x in ["Saatlik", "Geç Kalma"]):
+                            b, d = datetime.strptime(row['Başlangıç'], F_TAM), datetime.strptime(row['Dönüş'], F_TAM)
+                        else:
+                            b, d = datetime.strptime(row['Başlangıç'][:10], F_TARIH), datetime.strptime(row['Dönüş'][:10], F_TARIH)
+                        events.append({"title": f"{row[ad_c]} ({row['Tür']})", "start": b.strftime('%Y-%m-%d %H:%M'), "end": d.strftime('%Y-%m-%d %H:%M'), "allDay": not any(x in ts for x in ["Saatlik", "Geç Kalma"])})
+                    except: pass
+                calendar(events=events, options={"headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek,timeGridDay"}, "initialView": "dayGridMonth"})
             else: st.info("Onaylı izin yok.")
 
-        with tab_karne:
+        with sekmeler[2]: # KARNE
             if not df_o.empty and 'Ay' in df_o.columns:
                 aylar = df_o['Ay'].dropna().unique()
                 if len(aylar) > 0:
                     secili_ay = st.selectbox("Ay Seçiniz", aylar)
-                    df_ay = df_o[df_o['Ay'] == secili_ay].groupby([ad_c, 'Tür']).agg({'G': 'sum', 'S': 'sum'}).reset_index()
-                    st.dataframe(df_ay, use_container_width=True)
+                    df_ay = df_o[df_o['Ay'] == secili_ay].groupby([ad_c, 'Tür']).agg({'G': 'sum', 'S': 'sum'})
+                    st.dataframe(df_ay)
+                    st.download_button("📄 PDF İndir", data=pdf_olustur(df_ay, secili_ay), file_name="karne.pdf", mime="application/pdf")
                 else: st.info("Ay verisi bulunamadı.")
-            else: st.info("Onaylanmış izin verisi yok.")
-
-        with tab_sicil:
-            secili_p = st.selectbox("Personel Seçiniz", p_listesi, key="sicil_p")
-            if not df_o.empty: 
-                df_p_o = df_o[df_o[ad_c] == secili_p]
-                if not df_p_o.empty: st.dataframe(df_p_o[["Tür", "Başlangıç", "Dönüş"]], use_container_width=True)
-                else: st.info("Bu personele ait onaylı izin yok.")
-
-        with tab_liste:
-            if not df_all.empty: st.dataframe(df_all, use_container_width=True)
-            else: st.info("Veritabanı boş.")
-    else:
-        if sifre != "": st.sidebar.error("Hatalı Şifre!")
