@@ -49,11 +49,9 @@ def yukle():
         if df.empty: return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         df.columns = [str(c).strip() for c in df.columns]
         
-        # Google Sheets sütun isimlerinden bağımsız ilk 5 sütunu sırayla eşitle
         df = df.iloc[:, :5]
         df.columns = ["Zaman Damgası", "Ad Soyad", "Tür", "Başlangıç", "Dönüş"]
         
-        # Ekstra Durum sütunu kontrolü
         df["Durum"] = "Onaylandı" if "Durum" not in df.columns else df["Durum"].fillna("Onay Bekliyor")
         df["Ad Soyad"] = df["Ad Soyad"].astype(str).str.strip().str.upper()
         
@@ -62,22 +60,26 @@ def yukle():
                 ts = str(r['Tür']).upper()
                 b_s, d_s = str(r['Başlangıç']).strip(), str(r['Dönüş']).strip()
                 if "SAATLIK" in ts or "GEC" in ts or "SAATLİK" in ts or "GEÇ" in ts:
-                    b, d = datetime.strptime(b_s, F_TAM), datetime.strptime(d_s, F_TAM)
+                    b = datetime.strptime(b_s, F_TAM)
+                    d = datetime.strptime(d_s, F_TAM)
                     return pd.Series([0.0, round((d-b).total_seconds()/3600, 2)])
                 else:
-                    b, d = datetime.strptime(b_s[:10], F_TARIH), datetime.strptime(d_s[:10], F_TARIH)
+                    b = datetime.strptime(b_s[:10], F_TARIH)
+                    d = datetime.strptime(d_s[:10], F_TARIH)
                     return pd.Series([float((d-b).days), 0.0])
-            except: 
+            except:
                 return pd.Series([0.0, 0.0])
             
         df_b = df[df["Durum"].str.contains("Bekliyor", case=False, na=True)].copy()
         df_o = df[df["Durum"].str.contains("Onaylandı", case=False, na=False)].copy()
+        
         if not df_o.empty:
             df_o[['G', 'S']] = df_o.apply(h, axis=1)
             df_o['T'] = pd.to_datetime(df_o['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
             df_o['Ay'] = df_o['T'].dt.strftime('%B').map(TR_AYLAR) + " " + df_o['T'].dt.strftime('%Y')
+            
         return df, df_b, df_o
-    except: 
+    except:
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 df_all, df_b, df_o = yukle()
@@ -187,3 +189,4 @@ else:
                         df_p_yillik = df_o[(df_o["Ad Soyad"] == p) & (df_o['Tür'].str.contains("Yıllık", case=False, na=False))]
                         kullanilan = df_p_yillik['G'].sum()
                     
+                    kalan = toplam_hak - kullanilan
