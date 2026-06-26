@@ -84,7 +84,6 @@ def yukle():
         df[durum_col] = df.get(durum_col, "Onay Bekliyor").fillna("Onay Bekliyor").astype(str).str.strip()
         df[ad_col] = df[ad_col].astype(str).str.strip().str.upper()
         
-        # Karakter ve büyük/küçük harf duyarlılığı hatası giderildi
         def h(r):
             try:
                 ts = str(r['Tür']).upper().replace('İ', 'I').replace('Ş', 'S').replace('Ğ', 'G').replace('Ç', 'C').replace('Ü', 'U').replace('Ö', 'O')
@@ -182,3 +181,4 @@ else:
                         continue
                 
                 calendar_options = {
+                    "headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek,timeGridDay"},
