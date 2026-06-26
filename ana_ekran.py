@@ -39,7 +39,8 @@ def pdf_olustur(df, secili_ay, ad_c):
     elements.append(Paragraph(f"<b>{tr(secili_ay)} - Personel Izin Karnesi</b>", styles['Title']))
     data = [["Ad Soyad", "Izin Turu", "Gun", "Saat/Dakika"]]
     for idx, row in df.iterrows():
-        data.append([tr(row[ad_c]), tr(row['Tür']), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
+        # idx[0] Ad Soyad'ı, idx[1] İzin Türünü temsil eder
+        data.append([tr(idx[0]), tr(idx[1]), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
     table = Table(data, colWidths=[160, 140, 80, 100])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.darkred), 
@@ -183,4 +184,3 @@ else:
                     "locale": "tr"
                 }
                 calendar(events=events, options=calendar_options)
-            else:
