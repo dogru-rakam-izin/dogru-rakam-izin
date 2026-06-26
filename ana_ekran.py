@@ -36,7 +36,7 @@ def pdf_olustur(df, secili_ay):
     data = [["Ad Soyad", "Izin Turu", "Gun", "Saat/Dakika"]]
     for idx, row in df.iterrows():
         data.append([tr(idx), tr(idx), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
-    # HATA DÜZELTİLDİ: Boş kalan colWidths parametresine standart genişlik değerleri atandı
+    # HATA BURADAYDI: Boş bırakılan genişlik parametresi düzeltildi
     table = Table(data, colWidths=[160, 140, 80, 100])
     table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.darkred), ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke), ('ALIGN', (0, 0), (-1, -1), 'CENTER'), ('GRID', (0, 0), (-1, -1), 0.5, colors.black)]))
     elements.append(table)
@@ -90,7 +90,7 @@ def yukle():
         df_o = df[df[durum_col].str.contains("Onaylandı", case=False, na=False)].copy()
         if not df_o.empty:
             res = df_o.apply(lambda r: pd.Series(h(r)), axis=1)
-            df_o['G'], df_o['S'] = res[0].astype(float), res[1].astype(float)
+            df_o['G'], df_o['S'] = res.astype(float), res.astype(float)
             df_o['T'] = pd.to_datetime(df_o['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
             df_o['Ay'] = df_o['T'].dt.strftime('%B').map(TR_AYLAR) + " " + df_o['T'].dt.strftime('%Y')
         return df, df_b, df_o, ad_col
@@ -130,7 +130,7 @@ if menu == "👤 PERSONEL GİRİŞİ":
 else:
     sifre = st.sidebar.text_input("Şifre", type="password")
     if sifre == "2020":
-        # HATA DÜZELTİLDİ: st.tabs yapısı güncel Streamlit standartlarına uyarlandı
+        # Eski yapının çökmesini engellemek için sekmeler adlandırıldı
         tab_onay, tab_takvim, tab_karne, tab_sicil, tab_yillik, tab_manuel, tab_gecikme, tab_liste = st.tabs(
             ["🔔 Onay", "📅 Takvim", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel", "⏰ Geç Kalma", "🗑️ Liste"]
         )
