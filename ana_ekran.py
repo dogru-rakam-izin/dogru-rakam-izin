@@ -39,8 +39,7 @@ def pdf_olustur(df, secili_ay, ad_c):
     elements.append(Paragraph(f"<b>{tr(secili_ay)} - Personel Izin Karnesi</b>", styles['Title']))
     data = [["Ad Soyad", "Izin Turu", "Gun", "Saat/Dakika"]]
     for idx, row in df.iterrows():
-        # idx[0] Ad Soyad'ı, idx[1] İzin Türünü temsil eder
-        data.append([tr(idx[0]), tr(idx[1]), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
+        data.append([tr(row[ad_c]), tr(row['Tür']), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
     table = Table(data, colWidths=[160, 140, 80, 100])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.darkred), 
@@ -85,16 +84,19 @@ def yukle():
         df[durum_col] = df.get(durum_col, "Onay Bekliyor").fillna("Onay Bekliyor").astype(str).str.strip()
         df[ad_col] = df[ad_col].astype(str).str.strip().str.upper()
         
+        # Karakter ve büyük/küçük harf duyarlılığı hatası giderildi
         def h(r):
             try:
-                ts, b_s, d_s = str(r['Tür']), str(r['Başlangıç']).strip(), str(r['Dönüş']).strip()
-                if any(x in ts for x in ["Saatlik", "Geç Kalma"]):
+                ts = str(r['Tür']).upper().replace('İ', 'I').replace('Ş', 'S').replace('Ğ', 'G').replace('Ç', 'C').replace('Ü', 'U').replace('Ö', 'O')
+                b_s, d_s = str(r['Başlangıç']).strip(), str(r['Dönüş']).strip()
+                if "SAATLIK" in ts or "GEC KALMA" in ts or "SAATLİK" in ts or "GEÇ KALMA" in ts:
                     b, d = datetime.strptime(b_s, F_TAM), datetime.strptime(d_s, F_TAM)
                     return pd.Series([0.0, round((d-b).total_seconds()/3600, 2)])
                 else:
                     b, d = datetime.strptime(b_s[:10], F_TARIH), datetime.strptime(d_s[:10], F_TARIH)
                     return pd.Series([float((d-b).days), 0.0])
-            except: return pd.Series([0.0, 0.0])
+            except: 
+                return pd.Series([0.0, 0.0])
             
         df_b = df[df[durum_col].str.contains("Bekliyor", case=False, na=True)].copy()
         df_o = df[df[durum_col].str.contains("Onaylandı", case=False, na=False)].copy()
@@ -103,7 +105,8 @@ def yukle():
             df_o['T'] = pd.to_datetime(df_o['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
             df_o['Ay'] = df_o['T'].dt.strftime('%B').map(TR_AYLAR) + " " + df_o['T'].dt.strftime('%Y')
         return df, df_b, df_o, ad_col
-    except: return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
+    except: 
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), "Ad Soyad"
 
 df_all, df_b, df_o, ad_c = yukle()
 p_listesi = sorted(list(PERSONEL_GIRISLERI.keys()))
@@ -179,8 +182,3 @@ else:
                         continue
                 
                 calendar_options = {
-                    "headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek,timeGridDay"},
-                    "initialView": "dayGridMonth",
-                    "locale": "tr"
-                }
-                calendar(events=events, options=calendar_options)
