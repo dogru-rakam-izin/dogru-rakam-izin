@@ -39,7 +39,7 @@ def pdf_olustur(df, secili_ay):
     elements.append(Paragraph(f"<b>{tr(secili_ay)} - Personel Izin Karnesi</b>", styles['Title']))
     data = [["Ad Soyad", "Izin Turu", "Gun", "Saat/Dakika"]]
     for idx, row in df.iterrows():
-        data.append([tr(idx), tr(idx), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
+        data.append([tr(row[df.columns[0]]), tr(row['Tür']), sure_formatla(row['G'], "G"), sure_formatla(row['S'], "S")])
     table = Table(data, colWidths=[160, 140, 80, 100])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.darkred), 
