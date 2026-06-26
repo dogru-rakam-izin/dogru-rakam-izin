@@ -89,17 +89,16 @@ def yukle():
                 ts, b_s, d_s = str(r['Tür']), str(r['Başlangıç']).strip(), str(r['Dönüş']).strip()
                 if any(x in ts for x in ["Saatlik", "Geç Kalma"]):
                     b, d = datetime.strptime(b_s, F_TAM), datetime.strptime(d_s, F_TAM)
-                    return 0, round((d-b).total_seconds()/3600, 2)
+                    return pd.Series([0.0, round((d-b).total_seconds()/3600, 2)])
                 else:
                     b, d = datetime.strptime(b_s[:10], F_TARIH), datetime.strptime(d_s[:10], F_TARIH)
-                    return (d-b).days, 0
-            except: return 0, 0
+                    return pd.Series([float((d-b).days), 0.0])
+            except: return pd.Series([0.0, 0.0])
             
         df_b = df[df[durum_col].str.contains("Bekliyor", case=False, na=True)].copy()
         df_o = df[df[durum_col].str.contains("Onaylandı", case=False, na=False)].copy()
         if not df_o.empty:
-            res = df_o.apply(lambda r: pd.Series(h(r)), axis=1)
-            df_o['G'], df_o['S'] = res[0].astype(float), res[1].astype(float)
+            df_o[['G', 'S']] = df_o.apply(h, axis=1)
             df_o['T'] = pd.to_datetime(df_o['Başlangıç'].str[:10], dayfirst=True, errors='coerce')
             df_o['Ay'] = df_o['T'].dt.strftime('%B').map(TR_AYLAR) + " " + df_o['T'].dt.strftime('%Y')
         return df, df_b, df_o, ad_col
@@ -139,7 +138,6 @@ if menu == "👤 PERSONEL GİRİŞİ":
 else:
     sifre = st.sidebar.text_input("Şifre", type="password")
     if sifre == "2020":
-        # Uniq sekmeler atanarak Python'un blok şaşırması engellendi
         tab_onay, tab_takvim, tab_karne, tab_sicil, tab_yillik, tab_manuel, tab_gecikme, tab_liste = st.tabs(
             ["🔔 Onay", "📅 Takvim", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel", "⏰ Geç Kalma", "🗑️ Liste"]
         )
@@ -184,3 +182,5 @@ else:
                     "initialView": "dayGridMonth",
                     "locale": "tr"
                 }
+                calendar(events=events, options=calendar_options)
+            else:
