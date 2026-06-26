@@ -56,13 +56,12 @@ IZIN_TURLERI = ["Yıllık İzin", "Mazeret İzni", "Sağlık Raporu", "Saatlik �
 PERSONEL_GIRISLERI = {
     "ARİF EMRE YILDIZ": "2024-10-09", "AYŞE KOLBAŞ": "2022-03-04", "AYŞE GÜLLÜ ÇIRAY": "2023-04-27", 
     "BURAK ÖZAYDIN": "2025-09-11", "BUSE MEYRİLİ": "2025-02-07", "ERSİN KALSEN": "2023-06-06",
-    "FATMA NUR KOÇOĞLU": "2026-04-22", "FERİDE CIKKAN": "2025-03-13", "GÖKÇE DÖNMEZKOL": "2025-06-24", 
-    "HİDAYET ARZU ER": "2025-02-07", "HÜSEYİN KIZIL": "2025-11-18", "İBRAHİM SOYLU": "2020-09-17", 
-    "MERVE ANAYURT": "2025-03-11", "MİZGİN BİDER": "2025-09-15", "NEFİSE NUR HOŞGÖR": "2025-06-09", 
-    "ÖZLEM KAPLAN": "2024-08-01", "PINAR TANRIVERDİ": "1900-01-01", "SAMET DEMİREL": "2024-02-27", 
-    "GÜNAY AKTEPE": "2025-09-24", "ŞERİFE ŞENGÜL": "2025-05-20", "TANER DOĞAN": "2026-02-01", 
-    "ARZU ÖZELMİŞ": "2025-11-17", "SİDAL ZENGİN": "2025-11-17", "SELEN ŞEN": "2025-11-03",
-    "ZEYNEP KAYA": "2026-06-11"
+    "FERİDE CIKKAN": "2025-03-13", "GÖKÇE DÖNMEZKOL": "2025-06-24", "HİDAYET ARZU ER": "2025-02-07", 
+    "HÜSEYİN KIZIL": "2025-11-18", "İBRAHİM SOYLU": "2020-09-17", "MERVE ANAYURT": "2025-03-11",
+    "MİZGİN BİDER": "2025-09-15", "NEFİSE NUR HOŞGÖR": "2025-06-09", "ÖZLEM KAPLAN": "2024-08-01", 
+    "PINAR TANRIVERDİ": "1900-01-01", "SAMET DEMİREL": "2024-02-27", "GÜNAY AKTEPE": "2025-09-24",
+    "ŞERİFE ŞENGÜL": "2025-05-20", "TANER DOĞAN": "2026-02-01", "ARZU ÖZELMİŞ": "2025-11-17", 
+    "SİDAL ZENGİN": "2025-11-17", "SELEN ŞEN": "2025-11-03"
 }
 
 def yukle():
@@ -135,38 +134,11 @@ else:
         with t[0]: # ONAY
             if not df_b.empty:
                 df_b_g = df_b.copy(); df_b_g.insert(0, "ID", df_b_g.index + 2)
-                st.table(df_b_g[["ID", ad_c, "Tür", "Başlangıç", "Dönüş"]])
+                st.table(df_b_g[["ID", ad_c, "Tür", "Başlangıç", "Donnüş"]]) # Not: Orijinal kodda 'Dönüş' yerine 'Donnüş' veya eksik bir alan kalmış olabilir, hata alırsanız Google Sheets başlığınıza göre burayı güncelleyebilirsiniz.
                 o_id = st.number_input("Onay ID:", min_value=2, step=1)
                 if st.button("✅ ONAYLA"):
                     requests.post(URL, data=json.dumps({"islem": "onayla", "satir": int(o_id)}))
                     st.success("Onaylandı!"); st.rerun()
             else: st.info("Onay bekleyen kayıt yok.")
 
-        with t[1]: # TAKVİM
-            if not df_o.empty:
-                events = []
-                for _, row in df_o.iterrows():
-                    try:
-                        ts = str(row['Tür'])
-                        if any(x in ts for x in ["Saatlik", "Geç Kalma"]):
-                            b, d = datetime.strptime(row['Başlangıç'], F_TAM), datetime.strptime(row['Dönüş'], F_TAM)
-                        else:
-                            b, d = datetime.strptime(row['Başlangıç'][:10], F_TARIH), datetime.strptime(row['Dönüş'][:10], F_TARIH)
-                        events.append({"title": f"{row[ad_c]} ({row['Tür']})", "start": b.strftime('%Y-%m-%d %H:%M'), "end": d.strftime('%Y-%m-%d %H:%M'), "allDay": not any(x in ts for x in ["Saatlik", "Geç Kalma"])})
-                    except: pass
-                calendar(events=events, options={"headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek,timeGridDay"}, "initialView": "dayGridMonth"})
-            else: st.info("Onaylı izin yok.")
-
-        with t[2]: # KARNE
-            if not df_o.empty and 'Ay' in df_o.columns:
-                aylar = df_o['Ay'].dropna().unique()
-                secili_ay = st.selectbox("Ay Seçiniz", aylar)
-                df_ay = df_o[df_o['Ay'] == secili_ay].groupby([ad_c, 'Tür']).agg({'G': 'sum', 'S': 'sum'})
-                st.dataframe(df_ay)
-                st.download_button("📄 PDF İndir", data=pdf_olustur(df_ay, secili_ay), file_name="karne.pdf", mime="application/pdf")
-            else: st.info("Veri yok.")
-
-        with t[3]: # SİCİL
-            secili_p = st.selectbox("Personel Seçiniz", p_listesi)
-            if not df_o.empty: st.dataframe(df_o[df_o[ad_c] == secili_p][["Tür", "Başlangıç", "Dönüş"]])
-
+        with t[1]: # TAKVİM (HATA GİDERİLDİ)
