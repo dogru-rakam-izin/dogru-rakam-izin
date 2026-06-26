@@ -130,6 +130,7 @@ if menu == "👤 PERSONEL GİRİŞİ":
 else:
     sifre = st.sidebar.text_input("Şifre", type="password")
     if sifre == "2020":
+        # Sekmeler liste olarak oluşturulup düzgünce indekslendi
         t = st.tabs(["🔔 Onay", "📅 Takvim", "📊 Karne", "📄 Sicil", "📅 Yıllık İzin", "📝 Manuel", "⏰ Geç Kalma", "🗑️ Liste"])
         
         with t[0]: # ONAY
@@ -152,7 +153,7 @@ else:
                             b, d = datetime.strptime(row['Başlangıç'], F_TAM), datetime.strptime(row['Dönüş'], F_TAM)
                         else:
                             b, d = datetime.strptime(row['Başlangıç'][:10], F_TARIH), datetime.strptime(row['Dönüş'][:10], F_TARIH)
-                        events.append({"title": f"{row[ad_col]} ({row['Tür']})", "start": b.strftime('%Y-%m-%d %H:%M'), "end": d.strftime('%Y-%m-%d %H:%M'), "allDay": not any(x in ts for x in ["Saatlik", "Geç Kalma"])})
+                        events.append({"title": f"{row[ad_c]} ({row['Tür']})", "start": b.strftime('%Y-%m-%d %H:%M'), "end": d.strftime('%Y-%m-%d %H:%M'), "allDay": not any(x in ts for x in ["Saatlik", "Geç Kalma"])})
                     except: pass
                 calendar(events=events, options={"headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek,timeGridDay"}, "initialView": "dayGridMonth"})
             else: st.info("Onaylı izin yok.")
@@ -160,13 +161,11 @@ else:
         with t[2]: # KARNE
             if not df_o.empty and 'Ay' in df_o.columns:
                 aylar = df_o['Ay'].dropna().unique()
-                secili_ay = st.selectbox("Ay Seçiniz", aylar)
-                df_ay = df_o[df_o['Ay'] == secili_ay].groupby([ad_c, 'Tür']).agg({'G': 'sum', 'S': 'sum'})
-                st.dataframe(df_ay)
-                st.download_button("📄 PDF İndir", data=pdf_olustur(df_ay, secili_ay), file_name="karne.pdf", mime="application/pdf")
-            else: st.info("Veri yok.")
-
-        with t[3]: # SİCİL
-            secili_p = st.selectbox("Personel Seçiniz", p_listesi)
-            if not df_o.empty: st.dataframe(df_o[df_o[ad_c] == secili_p][["Tür", "Başlangıç", "Dönüş"]])
+                if len(aylar) > 0:
+                    secili_ay = st.selectbox("Ay Seçiniz", aylar)
+                    df_ay = df_o[df_o['Ay'] == secili_ay].groupby([ad_c, 'Tür']).agg({'G': 'sum', 'S': 'sum'})
+                    st.dataframe(df_ay)
+                    st.download_button("📄 PDF İndir", data=pdf_olustur(df_ay, secili_ay), file_name="karne.pdf", mime="application/pdf")
+                else: st.info("Ay verisi bulunamadı.")
+            else: st.info("Onaylanmış izin verisi yok.")
 
